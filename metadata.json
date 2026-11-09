@@ -1,0 +1,6 @@
+{
+  "name": "Waterfall Studio Pro",
+  "description": "Especialista em Gráficos de Cascata (Bridge / Waterfall) e Análise de Variação Acumulada com reconciliação matemática exata.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

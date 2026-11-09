@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Waterfall Studio Pro</string>
+    <string name="app_subtitle">Análise de variação acumulada em cascata</string>
+    <string name="badge_validated">✓ Validado</string>
+    <string name="btn_undo">Desfazer</string>
+    <string name="btn_example">Exemplo</string>
+    <string name="btn_copy_16x9">Copiar 16:9</string>
+    <string name="btn_export_svg">SVG Vetorial</string>
+    <string name="btn_export_png">PNG 16:9</string>
+    <string name="tab_chart">Gráfico &amp; KPIs</string>
+    <string name="tab_data">1. Dados</string>
+    <string name="tab_import">2. Importar</string>
+    <string name="tab_style">3. Escala &amp; Estilo</string>
+    <string name="tab_table">Tabela &amp; Export</string>
+    <string name="cd_theme_toggle">Alternar Modo Claro / Escuro</string>
+    <string name="cd_undo">Desfazer última alteração</string>
+    <string name="cd_move_up">Mover para cima</string>
+    <string name="cd_move_down">Mover para baixo</string>
+    <string name="cd_delete_step">Remover etapa</string>
+</resources>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Base Pillar Q1 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M28,48h10v32h-10z" />
+    <!-- Positive Step 1 -->
+    <path
+        android:fillColor="#FF34D399"
+        android:pathData="M43,34h10v14h-10z" />
+    <!-- Negative Step 2 -->
+    <path
+        android:fillColor="#FFFB7185"
+        android:pathData="M58,34h10v8h-10z" />
+    <!-- Final Pillar Q2 -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M73,42h10v38h-10z" />
+    <!-- Top Delta Bracket -->
+    <path
+        android:fillColor="#FF93C5FD"
+        android:pathData="M32,26h48v3h-48z" />
+</vector>

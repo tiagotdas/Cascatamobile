@@ -1,0 +1,2742 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Waterfall Studio Pro - Especialista em Gráfico de Cascata</title>
+    <!-- Tailwind CSS via CDN com versão fixa -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Chart.js 4.4.1 com Subresource Integrity (SRI) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" integrity="sha256-0q+JdOlScWOHcunpUk21uab1jW7C1deBQARHtKMcaB4=" crossorigin="anonymous"></script>
+    <!-- SheetJS (xlsx) sem hash SRI conflitante + Gerador Nativo Embutido para 100% de disponibilidade -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(148, 163, 184, 0.4);
+            border-radius: 9999px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: rgba(148, 163, 184, 0.7);
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
+
+    <!-- Notificação Toast Flutuante com suporte a Undo -->
+    <div id="toastNotification" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 pointer-events-none transition-all duration-300 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg bg-slate-900 dark:bg-blue-600 text-white text-xs font-semibold">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-400 dark:text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+        <span id="toastMessage">Ação concluída com sucesso!</span>
+        <button id="toastUndoBtn" type="button" class="hidden ml-2 px-2 py-0.5 bg-white/20 hover:bg-white/30 rounded text-[11px] font-bold uppercase tracking-wider transition-colors pointer-events-auto">
+            Desfazer
+        </button>
+    </div>
+
+    <!-- Cabeçalho Superior -->
+    <header class="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 md:px-6 py-3 shadow-sm flex flex-wrap items-center justify-between gap-3 sticky top-0 z-30">
+        <div class="flex items-center space-x-3">
+            <div class="bg-blue-600 text-white p-2 rounded-xl shadow-md shadow-blue-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+                </svg>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-lg md:text-xl font-bold text-slate-900 dark:text-white tracking-tight">Waterfall <span class="text-blue-600 dark:text-blue-400">Studio Pro</span></h1>
+                    <span id="invariantBadge" class="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full" title="Status de verificação matemática contra oráculo BigInt">
+                        ✓ Validado
+                    </span>
+                </div>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Análise de variação acumulada em cascata</p>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+            <!-- Botão Desfazer (Undo) -->
+            <button id="undoBtn" type="button" disabled title="Desfazer última alteração (Ctrl+Z)" class="inline-flex items-center px-2.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 disabled:pointer-events-none text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+                Desfazer
+            </button>
+
+            <!-- Alternador de Modo Claro / Escuro -->
+            <button id="themeToggleBtn" type="button" title="Alternar Modo Claro / Escuro" class="inline-flex items-center justify-center p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg transition-colors">
+                <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 hidden text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
+
+            <button id="loadExampleTopBtn" type="button" class="inline-flex items-center px-2.5 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 mr-1 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Exemplo
+            </button>
+
+            <button id="copyImageBtn" type="button" title="Copia imagem padronizada 16:9 (1920x1080) com fundo claro" class="inline-flex items-center px-3 py-2 bg-indigo-50 dark:bg-indigo-950/70 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 text-xs font-semibold rounded-lg transition-all">
+                Copiar 16:9
+            </button>
+
+            <button id="exportSvgBtn" type="button" title="Exportar gráfico vetorial escalável (.svg) para PowerPoint/Figma" class="inline-flex items-center px-3 py-2 bg-emerald-50 dark:bg-emerald-950/70 hover:bg-emerald-100 dark:hover:bg-emerald-900 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold rounded-lg transition-all">
+                SVG Vetorial
+            </button>
+
+            <button id="exportBtn" type="button" title="Exportar PNG 16:9 Full HD (1920x1080) sempre em fundo claro executivo" class="inline-flex items-center px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-sm transition-all">
+                PNG 16:9
+            </button>
+        </div>
+    </header>
+
+    <!-- Conteúdo Principal -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <!-- Painel Lateral Esquerdo -->
+        <aside class="lg:col-span-5 xl:col-span-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            
+            <!-- Navegação de Abas da Sidebar -->
+            <div class="grid grid-cols-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/50 p-1.5 gap-1">
+                <button type="button" data-tab="dados" class="sidebar-tab-btn py-2 px-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm">
+                    1. Dados
+                </button>
+                <button type="button" data-tab="planilha" class="sidebar-tab-btn py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                    2. Importar
+                </button>
+                <button type="button" data-tab="estilo" class="sidebar-tab-btn py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
+                    3. Escala & Estilo
+                </button>
+            </div>
+
+            <div class="p-4 space-y-4">
+                <!-- ================= ABA 1: DADOS ================= -->
+                <div id="tab-dados" class="sidebar-tab-content space-y-4">
+                    <!-- Seletor de modo de análise -->
+                    <div class="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-lg border border-indigo-100 dark:border-indigo-900/60 space-y-1.5">
+                        <label for="analysisMode" class="block text-[11px] font-bold uppercase tracking-wider text-indigo-950 dark:text-indigo-300">Modo de Modelagem da Cascata</label>
+                        <select id="analysisMode" class="w-full px-3 py-1.5 text-xs font-semibold bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-800 rounded-md text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="bridge">Ponte entre Períodos (Base Q1 ➔ Eventos ➔ Base Q2)</option>
+                            <option value="cumulative">Fluxo Acumulado Livre (Partindo de Zero + Saldo Final)</option>
+                        </select>
+                    </div>
+
+                    <!-- Painel de Períodos Base (Q1 e Q2) -->
+                    <div id="bridgePeriodsPanel" class="p-3.5 bg-blue-50/60 dark:bg-blue-950/30 rounded-lg border border-blue-200/80 dark:border-blue-900/60 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">Períodos Base</span>
+                            <span id="q1EmptyWarning" class="hidden text-[10px] font-bold px-2 py-0.5 bg-rose-100 dark:bg-rose-900 text-rose-800 dark:text-rose-200 rounded animate-pulse">⚠️ Q1 vazio!</span>
+                        </div>
+
+                        <!-- Base Inicial (Ex: Q1) -->
+                        <div class="grid grid-cols-12 gap-2 items-end">
+                            <div class="col-span-7">
+                                <label for="startPeriodLabel" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Rótulo Base Inicial</label>
+                                <input type="text" id="startPeriodLabel" value="Receita Q1" class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="col-span-5">
+                                <label for="startPeriodValue" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Valor Inicial *</label>
+                                <input type="number" step="any" id="startPeriodValue" value="1200" class="w-full px-2.5 py-1.5 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Base Final (Ex: Q2) -->
+                        <div class="grid grid-cols-12 gap-2 items-end pt-2 border-t border-blue-200/60 dark:border-blue-900/50">
+                            <div class="col-span-7">
+                                <label for="endPeriodLabel" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Rótulo Base Final</label>
+                                <input type="text" id="endPeriodLabel" value="Receita Q2" class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="col-span-5">
+                                <label for="endPeriodValue" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Valor Alvo (Q2)</label>
+                                <input type="number" step="any" id="endPeriodValue" value="1450" placeholder="Auto (Soma)" class="w-full px-2.5 py-1.5 text-xs font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <!-- Reconciliação Automática de Gap (Desligada por padrão, tolerância estrita por padrão) -->
+                        <div class="pt-1 space-y-2">
+                            <label class="flex items-start space-x-2 cursor-pointer">
+                                <input type="checkbox" id="autoReconcileGap" class="w-3.5 h-3.5 mt-0.5 text-amber-600 rounded border-slate-300 focus:ring-amber-500">
+                                <span class="text-[11px] text-slate-700 dark:text-slate-300 leading-tight">Inserir plug hachurado <strong>"Outros / Não Explicado"</strong> se houver divergência em Q2</span>
+                            </label>
+                            <div class="flex items-center justify-between text-[11px] text-slate-600 dark:text-slate-400">
+                                <span>Tolerância sobre |Δ| (ou absoluta):</span>
+                                <select id="reconcileTolerancePct" class="px-1.5 py-0.5 text-[11px] font-mono bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded">
+                                    <option value="strict">0 (Estrito — Sem Tolerância)</option>
+                                    <option value="abs:0.01">Absoluta (±0,01 unid.)</option>
+                                    <option value="abs:1">Absoluta (±1,00 unid.)</option>
+                                    <option value="delta:0.001">0,10% de |Δ| (Variação)</option>
+                                    <option value="delta:0.005">0,50% de |Δ| (Variação)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Alerta de Status da Ponte Matemática -->
+                        <div id="bridgeStatusAlert" class="p-2.5 rounded-md text-[11px] font-medium border"></div>
+                    </div>
+
+                    <!-- Editor Visual de Eventos Estruturados [{id, label, value, isSubtotal}] -->
+                    <div class="p-3.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800 space-y-3">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">Etapas da Ponte</h3>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">Vírgulas nos nomes são preservadas com segurança</p>
+                            </div>
+                            <div class="flex items-center gap-1">
+                                <button type="button" id="sortDescBtn" title="Ordenar impactos (mantendo subtotais)" class="px-2 py-1 text-[11px] font-semibold bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded shadow-sm transition-colors">
+                                    Maior ➔ Menor
+                                </button>
+                                <button type="button" id="reverseOrderBtn" title="Inverter Ordem" class="px-2 py-1 text-[11px] font-semibold bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded shadow-sm transition-colors">
+                                    ⇅ Inverter
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Cabeçalho das Colunas -->
+                        <div class="grid grid-cols-12 gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
+                            <div class="col-span-6">Rótulo (ou Subtotal)</div>
+                            <div class="col-span-4">Impacto (+/-)</div>
+                            <div class="col-span-2 text-right">Ações</div>
+                        </div>
+
+                        <!-- Container de Linhas Dinâmicas sem perda de foco no Tab -->
+                        <div id="eventsListContainer" class="space-y-1.5 max-h-72 overflow-y-auto pr-1 custom-scrollbar"></div>
+
+                        <!-- Botões Adicionar Evento ou Subtotal Intermediário -->
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" id="addEventRowBtn" class="py-2 px-2.5 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 border border-dashed border-blue-300 dark:border-blue-700 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1">
+                                + Impacto (+/-)
+                            </button>
+                            <button type="button" id="addSubtotalRowBtn" title="Insere um pilar intermediário de Subtotal acumulado" class="py-2 px-2.5 bg-white dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-slate-700 text-indigo-600 dark:text-indigo-400 border border-dashed border-indigo-300 dark:border-indigo-700 rounded-lg text-xs font-semibold transition-colors flex items-center justify-center gap-1">
+                                + Subtotal (=)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ABA 2: IMPORTAÇÃO COM PRÉVIA E LOCALE ================= -->
+                <div id="tab-planilha" class="sidebar-tab-content hidden space-y-3.5">
+                    <div class="p-3.5 bg-emerald-50/70 dark:bg-emerald-950/30 rounded-lg border border-emerald-200/80 dark:border-emerald-900/60 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <label for="bulkPasteInput" class="text-xs font-bold uppercase tracking-wider text-emerald-950 dark:text-emerald-300">
+                                Importador de Planilha (Excel / Sheets / SAP)
+                            </label>
+                            <button type="button" id="fillBulkSampleBtn" class="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 hover:underline">
+                                Preencher modelo
+                            </button>
+                        </div>
+
+                        <!-- Seletor explícito de Locale Numérico de Entrada -->
+                        <div>
+                            <label for="importLocaleSelect" class="block text-[11px] font-semibold text-emerald-900 dark:text-emerald-200 mb-1">Padrão Numérico dos Dados Colados:</label>
+                            <select id="importLocaleSelect" class="w-full px-2.5 py-1.5 text-xs font-semibold bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-md">
+                                <option value="pt-BR">PT-BR / Europeu (1.200.000,50 — ponto é milhar)</option>
+                                <option value="en-US">EN-US / Internacional (1,200,000.50 — vírgula é milhar)</option>
+                                <option value="auto">Detecção Heurística Assistida (avisa ambiguidades)</option>
+                            </select>
+                        </div>
+
+                        <textarea id="bulkPasteInput" rows="6" placeholder="Receita Q1 2026&#9;1.200&#10;Vendas, Novos Canais&#9;280&#10;Expansão (Upsell)&#9;140&#10;Churn &amp; Cancelamentos&#9;170-&#10;Receita Q2 2026&#9;1.450" class="w-full px-3 py-2 text-xs bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-800 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono leading-relaxed"></textarea>
+
+                        <label class="flex items-center space-x-1.5 cursor-pointer">
+                            <input type="checkbox" id="bulkIncludeEndpoints" checked class="w-3.5 h-3.5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500">
+                            <span class="text-[11px] text-slate-700 dark:text-slate-300">1ª e última linhas físicas representam Bases (Q1 e Q2)</span>
+                        </label>
+
+                        <!-- Prévia Ao Vivo da Importação e Reconciliação de Controle -->
+                        <div id="importPreviewBox" class="bg-white dark:bg-slate-900 rounded-lg border border-emerald-200 dark:border-slate-800 p-2.5 space-y-2">
+                            <div class="flex flex-wrap items-center justify-between gap-1 text-[11px] font-bold text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 pb-1.5">
+                                <span id="previewRowCount">0 linhas</span>
+                                <span id="previewControlSum" class="font-mono text-emerald-700 dark:text-emerald-400">Aguardando dados</span>
+                            </div>
+                            <div id="previewBridgeCheck" class="hidden text-[10px] font-mono px-2 py-1 rounded bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"></div>
+                            <div id="previewTableContainer" class="max-h-44 overflow-y-auto custom-scrollbar text-[11px]">
+                                <p class="text-slate-400 italic py-2 text-center">Cole seus dados acima para conferir cada linha antes de aplicar.</p>
+                            </div>
+                        </div>
+
+                        <button type="button" id="applyBulkBtn" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:pointer-events-none text-white text-xs font-bold rounded-md shadow-sm transition-colors">
+                            Confirmar e Aplicar Importação
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ================= ABA 3: ESCALA & ESTILO ================= -->
+                <div id="tab-estilo" class="sidebar-tab-content hidden space-y-3.5">
+                    
+                    <!-- Títulos do Gráfico e Eixos -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2.5">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Títulos e Eixos</h3>
+                        <div>
+                            <label for="chartTitle" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Título Principal</label>
+                            <input type="text" id="chartTitle" class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md">
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label for="xAxisName" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Título Eixo X</label>
+                                <input type="text" id="xAxisName" class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md">
+                            </div>
+                            <div>
+                                <label for="yAxisName" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Título Eixo Y</label>
+                                <input type="text" id="yAxisName" class="w-full px-2.5 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Escala do Eixo Y (Quebra de Eixo / Foco nas Variações) -->
+                    <div class="p-3 bg-amber-50/50 dark:bg-amber-950/20 rounded-lg border border-amber-200/80 dark:border-amber-900/50 space-y-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-amber-900 dark:text-amber-300">Escala Vertical e Quebra de Eixo</h3>
+                        <label class="flex items-start space-x-2 cursor-pointer">
+                            <input type="checkbox" id="enableAxisBreak" class="w-4 h-4 mt-0.5 text-amber-600 rounded border-slate-300 focus:ring-amber-500">
+                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300 leading-snug">
+                                <strong>Quebrar Eixo Y (Zoom nas Variações):</strong> Ideal quando a Base Q1 é muito maior que os eventos (desenha indicador <code class="font-mono">//</code> na base).
+                            </span>
+                        </label>
+                    </div>
+
+                    <!-- Formatação Numérica e de Moeda Parametrizável -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2.5">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Formatação Numérica e Moeda</h3>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label for="displayLocale" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Padrão de Exibição</label>
+                                <select id="displayLocale" class="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md">
+                                    <option value="pt-BR">pt-BR (1.234,56)</option>
+                                    <option value="en-US">en-US (1,234.56)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="decimalPlaces" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Casas Decimais</label>
+                                <select id="decimalPlaces" class="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md">
+                                    <option value="0">0 casas</option>
+                                    <option value="1">1 casa</option>
+                                    <option value="2">2 casas</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label for="numberPrefix" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Prefixo</label>
+                                <select id="numberPrefix" class="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md">
+                                    <option value="">Nenhum</option>
+                                    <option value="R$ ">R$ (Real)</option>
+                                    <option value="US$ ">US$ (Dólar)</option>
+                                    <option value="€ ">€ (Euro)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="numberSuffix" class="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">Sufixo</label>
+                                <select id="numberSuffix" class="w-full px-2 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md">
+                                    <option value="">Nenhum</option>
+                                    <option value=" mil">mil</option>
+                                    <option value=" M">M (Milhões)</option>
+                                    <option value=" B">B (Bilhões)</option>
+                                    <option value="%">% (Percentual)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Paleta de Cores Executivas -->
+                    <div class="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800 space-y-2">
+                        <label for="colorPalette" class="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">Paleta de Cores</label>
+                        <select id="colorPalette" class="w-full px-2.5 py-1.5 text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-md">
+                            <option value="corporate">Corporativo Padrão (Azul / Esmeralda / Rose)</option>
+                            <option value="colorblind">Daltonismo Seguro (Azul / Ciano / Laranja)</option>
+                            <option value="monochrome">Monocromático Executivo (Marinho / Teal / Cinza)</option>
+                        </select>
+                    </div>
+
+                    <!-- Opções de Data Storytelling -->
+                    <div class="p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg border border-blue-100 dark:border-blue-900/50 space-y-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300">Elementos Visuais</h3>
+                        
+                        <div id="cumulativeTotalOptions" class="space-y-2 hidden">
+                            <label class="flex items-center space-x-2 cursor-pointer">
+                                <input type="checkbox" id="showTotalBar" checked class="w-4 h-4 text-blue-600 rounded border-slate-300">
+                                <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Exibir barra final de <strong>Saldo Acumulado</strong></span>
+                            </label>
+                            <div id="totalLabelContainer" class="pl-6">
+                                <input type="text" id="totalBarLabel" value="Saldo Final" class="w-full px-2 py-1 text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded">
+                            </div>
+                        </div>
+
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="showDeltaBracket" checked class="w-4 h-4 text-blue-600 rounded border-slate-300">
+                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Exibir arco superior de <strong>Variação Total (Δ)</strong></span>
+                        </label>
+
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="showDataLabels" checked class="w-4 h-4 text-blue-600 rounded border-slate-300">
+                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Exibir valores sobre as barras</span>
+                        </label>
+
+                        <label class="flex items-center space-x-2 cursor-pointer pl-6">
+                            <input type="checkbox" id="showPercentInLabels" class="w-3.5 h-3.5 text-blue-600 rounded border-slate-300">
+                            <span class="text-[11px] font-medium text-slate-600 dark:text-slate-400">Incluir <strong>% sobre Base Inicial</strong> nos rótulos</span>
+                        </label>
+
+                        <label class="flex items-center space-x-2 cursor-pointer">
+                            <input type="checkbox" id="showConnectors" checked class="w-4 h-4 text-blue-600 rounded border-slate-300">
+                            <span class="text-xs font-medium text-slate-700 dark:text-slate-300">Exibir linhas conectoras pontilhadas</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Botão para restaurar exemplo padrão -->
+                <div class="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end items-center text-xs">
+                    <button type="button" id="resetDataBtn" class="w-full py-2 px-3 bg-blue-50 dark:bg-slate-800 hover:bg-blue-100 dark:hover:bg-slate-700 text-blue-700 dark:text-blue-400 font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5">
+                        Restaurar Exemplo Padrão (com Undo)
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Área Principal Direita -->
+        <section class="lg:col-span-7 xl:col-span-8 lg:sticky lg:top-20 space-y-5">
+            
+            <!-- Cartões de KPI (6 indicadores incluindo Gap Não Explicado) -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2.5">
+                <div class="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <span id="kpiStartTitle" class="text-[10px] font-bold text-blue-700 dark:text-blue-400 uppercase block truncate">Base Inicial</span>
+                    <p id="kpiInitial" class="text-sm xl:text-base font-bold text-slate-800 dark:text-slate-100 mt-0.5 truncate">0</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <span class="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase block truncate">Entradas (+)</span>
+                    <p id="kpiPositive" class="text-sm xl:text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">+0</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <span class="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase block truncate">Saídas (-)</span>
+                    <p id="kpiNegative" class="text-sm xl:text-base font-bold text-rose-600 dark:text-rose-400 mt-0.5 truncate">-0</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900 p-3 rounded-xl border border-indigo-200 dark:border-indigo-900/70 bg-indigo-50/40 dark:bg-indigo-950/30 shadow-sm">
+                    <span class="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 uppercase block truncate">Variação (Δ)</span>
+                    <p id="kpiNetVariance" class="text-sm xl:text-base font-bold text-indigo-700 dark:text-indigo-300 mt-0.5 truncate">0</p>
+                </div>
+                <div id="kpiUnexplainedCard" class="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <span class="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase block truncate">Não Explicado</span>
+                    <p id="kpiUnexplained" class="text-sm xl:text-base font-bold text-slate-500 dark:text-slate-400 mt-0.5 truncate">0 (0,0%)</p>
+                </div>
+                <div class="bg-white dark:bg-slate-900 p-3 rounded-xl border border-blue-200 dark:border-blue-900/70 bg-blue-50/30 dark:bg-blue-950/30 shadow-sm">
+                    <span id="kpiEndTitle" class="text-[10px] font-bold text-blue-700 dark:text-blue-400 uppercase block truncate">Base Final</span>
+                    <p id="kpiFinal" class="text-sm xl:text-base font-bold text-blue-700 dark:text-blue-400 mt-0.5 truncate">0</p>
+                </div>
+            </div>
+
+            <!-- Card Principal do Canvas -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                <div class="flex flex-wrap items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3.5 mb-4 gap-2">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2.5 h-2.5 bg-blue-600 rounded-full"></span>
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-300 uppercase tracking-wider">Gráfico de Cascata (Bridge / Waterfall)</span>
+                    </div>
+                    <!-- Legenda Semântica Dinâmica -->
+                    <div class="flex flex-wrap items-center gap-3 text-xs font-medium text-slate-600 dark:text-slate-300">
+                        <span class="flex items-center"><span id="legendSwatchBase" class="w-3 h-3 rounded-sm bg-blue-600 inline-block mr-1.5"></span>Bases / Subtotais</span>
+                        <span class="flex items-center"><span id="legendSwatchPos" class="w-3 h-3 rounded-sm bg-emerald-500 inline-block mr-1.5"></span>Positivo (+)</span>
+                        <span class="flex items-center"><span id="legendSwatchNeg" class="w-3 h-3 rounded-sm bg-rose-500 inline-block mr-1.5"></span>Negativo (-)</span>
+                        <span class="flex items-center"><span id="legendSwatchAdj" class="w-3 h-3 rounded-sm bg-amber-500 inline-block mr-1.5 border border-amber-700"></span>Plug / Ajuste (Hachurado)</span>
+                    </div>
+                </div>
+
+                <!-- Container Responsivo do Canvas -->
+                <div class="relative w-full flex items-center justify-center h-[430px]">
+                    <canvas id="mainChartCanvas"></canvas>
+                </div>
+
+                <!-- Rodapé informativo da área de plotagem -->
+                <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap justify-between items-center text-[11px] text-slate-400 gap-2">
+                    <div id="dataCounter">Total de etapas: 0</div>
+                    <div id="invariantCheckStatus" class="font-mono text-emerald-600 dark:text-emerald-400">Invariante: Base + ΣEventos = Final ✓</div>
+                </div>
+            </div>
+
+            <!-- Tabela Resumo Executiva Abaixo do Gráfico com Exportação Numérica Pura -->
+            <div class="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200">Tabela Executiva de Reconciliação</h3>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <button type="button" id="copyRawTsvBtn" title="Copia números puros sem símbolo de moeda ou milhar para cálculo imediato no Excel" class="inline-flex items-center px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-semibold rounded-md transition-colors">
+                            Copiar TSV Numérico (Excel)
+                        </button>
+                        <button type="button" id="copyFormattedTsvBtn" title="Copia tabela com formatação de moeda e texto para documentos" class="inline-flex items-center px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-md transition-colors">
+                            Copiar TSV Formatado
+                        </button>
+                        <button type="button" id="exportXlsxBtn" title="Baixar planilha Excel (.xlsx) com células numéricas nativas" class="inline-flex items-center px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md transition-colors">
+                            Baixar .XLSX
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 dark:bg-slate-800/70 text-slate-500 dark:text-slate-400 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200 dark:border-slate-800">
+                                <th class="py-2.5 px-4">Etapa / Categoria</th>
+                                <th class="py-2.5 px-4">Classificação</th>
+                                <th class="py-2.5 px-4 text-right">Impacto / Nível</th>
+                                <th class="py-2.5 px-4 text-right">% s/ Base</th>
+                                <th class="py-2.5 px-4 text-right">Saldo Acumulado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="executiveTableBody" class="divide-y divide-slate-100 dark:divide-slate-800/70 font-medium">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const STORAGE_KEY = 'waterfall_studio_pro_state_v5';
+        const SCALE_FACTOR = 10000; // Aritmética inteira exata (4 casas decimais escaladas)
+        const BIGINT_SCALE = 10000n;
+        let engineSelfTestPassed = false;
+
+        // Utilitários de Segurança e Aritmética Inteira
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function toScaledInt(num) {
+            const parsed = Number(num);
+            if (!Number.isFinite(parsed)) return 0;
+            return Math.round(parsed * SCALE_FACTOR);
+        }
+
+        function fromScaledInt(scaled) {
+            return scaled / SCALE_FACTOR;
+        }
+
+        // Oráculo Independente em BigInt puro para verificação cruzada de invariantes
+        function toBigIntScaled(val) {
+            const n = Number(val);
+            if (!Number.isFinite(n)) return 0n;
+            return BigInt(Math.round(n * Number(BIGINT_SCALE)));
+        }
+
+        // Definição das 3 Paletas Executivas
+        const COLOR_PALETTES = {
+            corporate: {
+                baseBg: 'rgba(37, 99, 235, 0.90)',
+                baseBorder: 'rgb(29, 78, 216)',
+                baseText: '#1d4ed8',
+                baseTextDark: '#60a5fa',
+                posBg: 'rgba(16, 185, 129, 0.85)',
+                posBorder: 'rgb(5, 150, 105)',
+                posText: '#047857',
+                posTextDark: '#34d399',
+                negBg: 'rgba(244, 63, 94, 0.85)',
+                negBorder: 'rgb(225, 29, 72)',
+                negText: '#be123c',
+                negTextDark: '#fb7185',
+                adjBg: 'rgba(245, 158, 11, 0.85)',
+                adjBorder: 'rgb(217, 119, 6)',
+                adjText: '#b45309',
+                adjTextDark: '#fbbf24'
+            },
+            colorblind: {
+                baseBg: 'rgba(30, 64, 175, 0.90)',
+                baseBorder: 'rgb(30, 58, 138)',
+                baseText: '#1e40af',
+                baseTextDark: '#93c5fd',
+                posBg: 'rgba(14, 165, 233, 0.85)',
+                posBorder: 'rgb(2, 132, 199)',
+                posText: '#0369a1',
+                posTextDark: '#38bdf8',
+                negBg: 'rgba(234, 88, 12, 0.85)',
+                negBorder: 'rgb(194, 65, 12)',
+                negText: '#c2410c',
+                negTextDark: '#fb923c',
+                adjBg: 'rgba(168, 85, 247, 0.85)',
+                adjBorder: 'rgb(147, 51, 234)',
+                adjText: '#7e22ce',
+                adjTextDark: '#c084fc'
+            },
+            monochrome: {
+                baseBg: 'rgba(15, 23, 42, 0.92)',
+                baseBorder: 'rgb(15, 23, 42)',
+                baseText: '#0f172a',
+                baseTextDark: '#e2e8f0',
+                posBg: 'rgba(13, 148, 136, 0.85)',
+                posBorder: 'rgb(15, 118, 110)',
+                posText: '#0f766e',
+                posTextDark: '#2dd4bf',
+                negBg: 'rgba(100, 116, 139, 0.85)',
+                negBorder: 'rgb(71, 85, 105)',
+                negText: '#475569',
+                negTextDark: '#94a3b8',
+                adjBg: 'rgba(217, 119, 6, 0.85)',
+                adjBorder: 'rgb(180, 83, 9)',
+                adjText: '#b45309',
+                adjTextDark: '#fbbf24'
+            }
+        };
+
+        // Estado Estruturado Padrão (Tolerância estrita 'strict' e Plug desligado por padrão)
+        const DEFAULT_STATE = {
+            analysisMode: 'bridge',
+            title: 'Ponte de Variação de Receita: Q1 vs Q2 2026',
+            startPeriodLabel: 'Receita Q1',
+            startPeriodValue: '1200',
+            endPeriodLabel: 'Receita Q2',
+            endPeriodValue: '1450',
+            autoReconcileGap: false,
+            reconcileTolerancePct: 'strict',
+            xAxisName: 'Fatores de Variação entre Trimestres',
+            yAxisName: 'Valor (R$ mil)',
+            events: [
+                { id: 'ev1', label: 'Novos Contratos, Enterprise', value: 280, isSubtotal: false },
+                { id: 'ev2', label: 'Expansão (Upsell)', value: 140, isSubtotal: false },
+                { id: 'ev3', label: 'Reajuste de Preços', value: 65, isSubtotal: false },
+                { id: 'ev4', label: 'Receita Bruta Potencial', value: 0, isSubtotal: true },
+                { id: 'ev5', label: 'Cancelamentos (Churn)', value: -160, isSubtotal: false },
+                { id: 'ev6', label: 'Descontos Comerciais', value: -75, isSubtotal: false }
+            ],
+            showTotalBar: true,
+            totalBarLabel: 'Saldo Final',
+            showConnectors: true,
+            showDataLabels: true,
+            showDeltaBracket: true,
+            showPercentInLabels: true,
+            enableAxisBreak: false,
+            displayLocale: 'pt-BR',
+            importLocale: 'pt-BR',
+            numberPrefix: 'R$ ',
+            numberSuffix: ' mil',
+            decimalPlaces: '0',
+            colorPalette: 'corporate',
+            darkMode: false
+        };
+
+        let appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        let undoStack = [];
+        const MAX_UNDO = 20;
+
+        // Referências DOM
+        const invariantBadge = document.getElementById('invariantBadge');
+        const analysisModeSelect = document.getElementById('analysisMode');
+        const bridgePeriodsPanel = document.getElementById('bridgePeriodsPanel');
+        const startPeriodLabelInput = document.getElementById('startPeriodLabel');
+        const startPeriodValueInput = document.getElementById('startPeriodValue');
+        const q1EmptyWarning = document.getElementById('q1EmptyWarning');
+        const endPeriodLabelInput = document.getElementById('endPeriodLabel');
+        const endPeriodValueInput = document.getElementById('endPeriodValue');
+        const autoReconcileGapInput = document.getElementById('autoReconcileGap');
+        const reconcileTolerancePctSelect = document.getElementById('reconcileTolerancePct');
+        const bridgeStatusAlert = document.getElementById('bridgeStatusAlert');
+        const cumulativeTotalOptions = document.getElementById('cumulativeTotalOptions');
+
+        const chartTitleInput = document.getElementById('chartTitle');
+        const xAxisNameInput = document.getElementById('xAxisName');
+        const yAxisNameInput = document.getElementById('yAxisName');
+        const showTotalBarInput = document.getElementById('showTotalBar');
+        const totalBarLabelInput = document.getElementById('totalBarLabel');
+        const totalLabelContainer = document.getElementById('totalLabelContainer');
+        const showConnectorsInput = document.getElementById('showConnectors');
+        const showDataLabelsInput = document.getElementById('showDataLabels');
+        const showDeltaBracketInput = document.getElementById('showDeltaBracket');
+        const showPercentInLabelsInput = document.getElementById('showPercentInLabels');
+        const enableAxisBreakInput = document.getElementById('enableAxisBreak');
+        const displayLocaleSelect = document.getElementById('displayLocale');
+        const importLocaleSelect = document.getElementById('importLocaleSelect');
+        const numberPrefixSelect = document.getElementById('numberPrefix');
+        const numberSuffixSelect = document.getElementById('numberSuffix');
+        const decimalPlacesSelect = document.getElementById('decimalPlaces');
+        const colorPaletteSelect = document.getElementById('colorPalette');
+
+        const eventsListContainer = document.getElementById('eventsListContainer');
+        const addEventRowBtn = document.getElementById('addEventRowBtn');
+        const addSubtotalRowBtn = document.getElementById('addSubtotalRowBtn');
+        const sortDescBtn = document.getElementById('sortDescBtn');
+        const reverseOrderBtn = document.getElementById('reverseOrderBtn');
+
+        const dataCounter = document.getElementById('dataCounter');
+        const invariantCheckStatus = document.getElementById('invariantCheckStatus');
+        const exportBtn = document.getElementById('exportBtn');
+        const exportSvgBtn = document.getElementById('exportSvgBtn');
+        const copyImageBtn = document.getElementById('copyImageBtn');
+        const copyRawTsvBtn = document.getElementById('copyRawTsvBtn');
+        const copyFormattedTsvBtn = document.getElementById('copyFormattedTsvBtn');
+        const exportXlsxBtn = document.getElementById('exportXlsxBtn');
+        const resetDataBtn = document.getElementById('resetDataBtn');
+        const loadExampleTopBtn = document.getElementById('loadExampleTopBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const sunIcon = document.getElementById('sunIcon');
+        const moonIcon = document.getElementById('moonIcon');
+
+        const bulkPasteInput = document.getElementById('bulkPasteInput');
+        const bulkIncludeEndpoints = document.getElementById('bulkIncludeEndpoints');
+        const applyBulkBtn = document.getElementById('applyBulkBtn');
+        const fillBulkSampleBtn = document.getElementById('fillBulkSampleBtn');
+        const previewRowCount = document.getElementById('previewRowCount');
+        const previewControlSum = document.getElementById('previewControlSum');
+        const previewBridgeCheck = document.getElementById('previewBridgeCheck');
+        const previewTableContainer = document.getElementById('previewTableContainer');
+
+        const kpiStartTitle = document.getElementById('kpiStartTitle');
+        const kpiEndTitle = document.getElementById('kpiEndTitle');
+        const kpiInitial = document.getElementById('kpiInitial');
+        const kpiPositive = document.getElementById('kpiPositive');
+        const kpiNegative = document.getElementById('kpiNegative');
+        const kpiNetVariance = document.getElementById('kpiNetVariance');
+        const kpiUnexplainedCard = document.getElementById('kpiUnexplainedCard');
+        const kpiUnexplained = document.getElementById('kpiUnexplained');
+        const kpiFinal = document.getElementById('kpiFinal');
+        const executiveTableBody = document.getElementById('executiveTableBody');
+
+        const toastNotification = document.getElementById('toastNotification');
+        const toastMessage = document.getElementById('toastMessage');
+        const toastUndoBtn = document.getElementById('toastUndoBtn');
+
+        const ctx = document.getElementById('mainChartCanvas').getContext('2d');
+        let chartInstance = null;
+        let toastTimeout = null;
+        let lastBridgeResult = null;
+
+        /**
+         * Formatação numérica e percentual padronizada
+         */
+        function formatNumber(num, includePlusSign = false, customConfig = null) {
+            const cfg = customConfig || appState;
+            const locale = cfg.displayLocale || 'pt-BR';
+            const decimals = parseInt(cfg.decimalPlaces, 10) || 0;
+            const prefix = cfg.numberPrefix || '';
+            const suffix = cfg.numberSuffix || '';
+
+            const clean = Number(Number(num).toFixed(decimals));
+            const absVal = Math.abs(clean === 0 ? 0 : clean);
+
+            const formatter = new Intl.NumberFormat(locale, {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: decimals
+            });
+
+            let signStr = '';
+            if (clean < 0) signStr = '-';
+            else if (includePlusSign && clean > 0) signStr = '+';
+
+            return `${signStr}${prefix}${formatter.format(absVal)}${suffix}`;
+        }
+
+        function formatExactDifference(num, customConfig = null) {
+            const cfg = customConfig || appState;
+            const locale = cfg.displayLocale || 'pt-BR';
+            const prefix = cfg.numberPrefix || '';
+            const suffix = cfg.numberSuffix || '';
+            const clean = Number(Number(num).toFixed(4));
+            const absVal = Math.abs(clean === 0 ? 0 : clean);
+            const hasDecimals = Math.abs(absVal - Math.round(absVal)) > 1e-6;
+            const decimals = hasDecimals ? Math.max(parseInt(cfg.decimalPlaces, 10) || 2, 2) : (parseInt(cfg.decimalPlaces, 10) || 0);
+
+            const formatter = new Intl.NumberFormat(locale, {
+                minimumFractionDigits: decimals,
+                maximumFractionDigits: 4
+            });
+            const signStr = clean < 0 ? '-' : (clean > 0 ? '+' : '');
+            return `${signStr}${prefix}${formatter.format(absVal)}${suffix}`;
+        }
+
+        function formatPercent(ratioFloat, includePlusSign = false, customConfig = null) {
+            const cfg = customConfig || appState;
+            const locale = cfg.displayLocale || 'pt-BR';
+            const pctValue = ratioFloat * 100;
+            const clean = Number(pctValue.toFixed(1));
+            const absVal = Math.abs(clean === 0 ? 0 : clean);
+
+            const formatter = new Intl.NumberFormat(locale, {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1
+            });
+
+            let signStr = '';
+            if (clean < 0) signStr = '-';
+            else if (includePlusSign && clean > 0) signStr = '+';
+
+            return `${signStr}${formatter.format(absVal)}%`;
+        }
+
+        /**
+         * Pilha de Histórico (Undo) para ações destrutivas
+         */
+        function pushUndoSnapshot(actionLabel = 'Alteração') {
+            undoStack.push({
+                label: actionLabel,
+                snapshot: JSON.parse(JSON.stringify(appState))
+            });
+            if (undoStack.length > MAX_UNDO) undoStack.shift();
+            undoBtn.disabled = undoStack.length === 0;
+        }
+
+        function performUndo() {
+            if (undoStack.length === 0) return;
+            const last = undoStack.pop();
+            appState = last.snapshot;
+            undoBtn.disabled = undoStack.length === 0;
+            syncInputsFromState();
+            renderVisualEventEditor();
+            saveStateToStorage();
+            updateApplicationView();
+            showToast(`Desfeito: ${last.label}`, false);
+        }
+
+        undoBtn.addEventListener('click', performUndo);
+        toastUndoBtn.addEventListener('click', () => {
+            performUndo();
+            toastNotification.classList.add('translate-y-20', 'opacity-0');
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                performUndo();
+            }
+        });
+
+        function showToast(message, showUndoAction = false) {
+            toastMessage.textContent = message;
+            if (showUndoAction && undoStack.length > 0) {
+                toastUndoBtn.classList.remove('hidden');
+            } else {
+                toastUndoBtn.classList.add('hidden');
+            }
+            toastNotification.classList.remove('translate-y-20', 'opacity-0');
+            if (toastTimeout) clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastNotification.classList.add('translate-y-20', 'opacity-0');
+            }, 4000);
+        }
+
+        /**
+         * Interpreta a configuração de tolerância selecionada (Estrita, Absoluta ou sobre |Δ|)
+         */
+        function computeAllowedToleranceScaled(tolSetting, netDeltaScaled) {
+            const raw = String(tolSetting || 'strict').trim();
+            if (raw === 'strict' || raw === '0') return 0;
+            if (raw.startsWith('abs:')) {
+                const val = parseFloat(raw.slice(4));
+                return Number.isFinite(val) ? toScaledInt(Math.abs(val)) : 0;
+            }
+            if (raw.startsWith('delta:')) {
+                const ratio = parseFloat(raw.slice(6));
+                return Number.isFinite(ratio) ? Math.round(Math.abs(netDeltaScaled) * ratio) : 0;
+            }
+            return 0;
+        }
+
+        /**
+         * MOTOR PURO DE CÁLCULO (buildBridge) + VERIFICAÇÃO CONTRA ORÁCULO INDEPENDENTE (BigInt)
+         */
+        function buildBridge(state) {
+            const isBridge = state.analysisMode === 'bridge';
+            const steps = [];
+            let runningScaled = 0;
+            let sumPosScaled = 0;
+            let sumNegScaled = 0;
+            let initialBaseScaled = 0;
+            let unexplainedGapScaled = 0;
+            let statusType = 'auto';
+            let q1Missing = false;
+
+            let oracleInitial = 0n;
+            let oracleEventsSum = 0n;
+
+            if (isBridge) {
+                const rawQ1 = String(state.startPeriodValue ?? '').trim();
+                q1Missing = rawQ1 === '' || isNaN(Number(rawQ1.replace(',', '.')));
+                const q1Val = q1Missing ? 0 : Number(rawQ1.replace(',', '.'));
+                initialBaseScaled = toScaledInt(q1Val);
+                runningScaled = initialBaseScaled;
+                oracleInitial = toBigIntScaled(q1Val);
+
+                const q1Label = String(state.startPeriodLabel || 'Base Q1').trim();
+                steps.push({
+                    label: q1Label,
+                    start: 0,
+                    end: fromScaledInt(initialBaseScaled),
+                    diff: fromScaledInt(initialBaseScaled),
+                    isBase: true,
+                    isSubtotal: false,
+                    isTotal: false,
+                    isAdjustment: false
+                });
+
+                (state.events || []).forEach((ev) => {
+                    if (ev.isSubtotal) {
+                        const subVal = fromScaledInt(runningScaled);
+                        steps.push({
+                            label: ev.label || 'Subtotal',
+                            start: 0,
+                            end: subVal,
+                            diff: subVal,
+                            isBase: false,
+                            isSubtotal: true,
+                            isTotal: false,
+                            isAdjustment: false
+                        });
+                    } else {
+                        const changeScaled = toScaledInt(ev.value);
+                        const startScaled = runningScaled;
+                        const endScaled = startScaled + changeScaled;
+                        runningScaled = endScaled;
+                        oracleEventsSum += toBigIntScaled(ev.value);
+
+                        if (changeScaled >= 0) sumPosScaled += changeScaled;
+                        else sumNegScaled += changeScaled;
+
+                        steps.push({
+                            label: ev.label || 'Evento',
+                            start: fromScaledInt(startScaled),
+                            end: fromScaledInt(endScaled),
+                            diff: fromScaledInt(changeScaled),
+                            isBase: false,
+                            isSubtotal: false,
+                            isTotal: false,
+                            isAdjustment: false
+                        });
+                    }
+                });
+
+                const q2Label = String(state.endPeriodLabel || 'Base Q2').trim();
+                const rawQ2 = String(state.endPeriodValue ?? '').trim();
+                const hasExplicitQ2 = rawQ2 !== '' && !isNaN(Number(rawQ2.replace(',', '.')));
+                const targetQ2Scaled = hasExplicitQ2 ? toScaledInt(Number(rawQ2.replace(',', '.'))) : runningScaled;
+
+                const gapScaled = targetQ2Scaled - runningScaled;
+                const netDeltaScaled = targetQ2Scaled - initialBaseScaled;
+                const allowedDiffScaled = computeAllowedToleranceScaled(state.reconcileTolerancePct, netDeltaScaled);
+
+                let finalBarScaled = runningScaled;
+
+                if (!hasExplicitQ2) {
+                    statusType = 'auto';
+                    unexplainedGapScaled = 0;
+                    finalBarScaled = runningScaled;
+                } else if (gapScaled === 0) {
+                    statusType = 'reconciled';
+                    unexplainedGapScaled = 0;
+                    finalBarScaled = targetQ2Scaled;
+                } else if (Math.abs(gapScaled) <= allowedDiffScaled) {
+                    statusType = 'reconciled_with_tol';
+                    unexplainedGapScaled = gapScaled;
+                    finalBarScaled = targetQ2Scaled;
+                } else if (state.autoReconcileGap) {
+                    statusType = 'plugged';
+                    unexplainedGapScaled = gapScaled;
+                    const startScaled = runningScaled;
+                    const endScaled = targetQ2Scaled;
+                    runningScaled = endScaled;
+                    finalBarScaled = targetQ2Scaled;
+
+                    steps.push({
+                        label: 'Outros / Não Explicado',
+                        start: fromScaledInt(startScaled),
+                        end: fromScaledInt(endScaled),
+                        diff: fromScaledInt(gapScaled),
+                        isBase: false,
+                        isSubtotal: false,
+                        isTotal: false,
+                        isAdjustment: true
+                    });
+                } else {
+                    statusType = 'divergent';
+                    unexplainedGapScaled = gapScaled;
+                    finalBarScaled = targetQ2Scaled;
+                }
+
+                steps.push({
+                    label: q2Label,
+                    start: 0,
+                    end: fromScaledInt(finalBarScaled),
+                    diff: fromScaledInt(finalBarScaled),
+                    isBase: true,
+                    isSubtotal: false,
+                    isTotal: true,
+                    isAdjustment: false,
+                    expectedEnd: fromScaledInt(runningScaled)
+                });
+
+                const explainedVarianceScaled = sumPosScaled + sumNegScaled;
+                const plugDrawnScaled = statusType === 'plugged' ? unexplainedGapScaled : 0;
+
+                const oraclePlug = BigInt(plugDrawnScaled);
+                const oracleTotalDrawn = oracleInitial + oracleEventsSum + oraclePlug;
+                const oracleFinalBar = BigInt(finalBarScaled);
+
+                const exactVisualMatch = (oracleTotalDrawn === oracleFinalBar) && (!q1Missing);
+
+                return {
+                    mode: 'bridge',
+                    q1Missing,
+                    statusType,
+                    steps,
+                    initialBase: fromScaledInt(initialBaseScaled),
+                    sumPositives: fromScaledInt(sumPosScaled),
+                    sumNegatives: fromScaledInt(sumNegScaled),
+                    explainedVariance: fromScaledInt(explainedVarianceScaled),
+                    unexplainedGap: fromScaledInt(unexplainedGapScaled),
+                    unexplainedPctOfBase: initialBaseScaled !== 0 ? (unexplainedGapScaled / Math.abs(initialBaseScaled)) : 0,
+                    unexplainedPctOfDelta: netDeltaScaled !== 0 ? (unexplainedGapScaled / Math.abs(netDeltaScaled)) : 0,
+                    netVariance: fromScaledInt(netDeltaScaled),
+                    pctDelta: initialBaseScaled !== 0 ? (netDeltaScaled / Math.abs(initialBaseScaled)) : null,
+                    finalValue: fromScaledInt(finalBarScaled),
+                    calculatedEnd: fromScaledInt(initialBaseScaled + explainedVarianceScaled),
+                    invariantHolds: exactVisualMatch,
+                    oracleDeltaScaled: Number(oracleFinalBar - oracleTotalDrawn)
+                };
+
+            } else {
+                initialBaseScaled = 0;
+                runningScaled = 0;
+
+                (state.events || []).forEach((ev) => {
+                    if (ev.isSubtotal) {
+                        const subVal = fromScaledInt(runningScaled);
+                        steps.push({
+                            label: ev.label || 'Subtotal',
+                            start: 0,
+                            end: subVal,
+                            diff: subVal,
+                            isBase: false,
+                            isSubtotal: true,
+                            isTotal: false,
+                            isAdjustment: false
+                        });
+                    } else {
+                        const changeScaled = toScaledInt(ev.value);
+                        const startScaled = runningScaled;
+                        const endScaled = startScaled + changeScaled;
+                        runningScaled = endScaled;
+                        oracleEventsSum += toBigIntScaled(ev.value);
+
+                        if (changeScaled >= 0) sumPosScaled += changeScaled;
+                        else sumNegScaled += changeScaled;
+
+                        steps.push({
+                            label: ev.label || 'Etapa',
+                            start: fromScaledInt(startScaled),
+                            end: fromScaledInt(endScaled),
+                            diff: fromScaledInt(changeScaled),
+                            isBase: false,
+                            isSubtotal: false,
+                            isTotal: false,
+                            isAdjustment: false
+                        });
+                    }
+                });
+
+                if (state.showTotalBar && steps.length > 0) {
+                    steps.push({
+                        label: String(state.totalBarLabel || 'Saldo Final').trim(),
+                        start: 0,
+                        end: fromScaledInt(runningScaled),
+                        diff: fromScaledInt(runningScaled),
+                        isBase: false,
+                        isSubtotal: false,
+                        isTotal: true,
+                        isAdjustment: false
+                    });
+                }
+
+                const lastDrawnStep = steps.length > 0 ? steps[steps.length - 1] : null;
+                const finalDrawnScaled = lastDrawnStep ? toScaledInt(lastDrawnStep.end) : 0;
+                const exactVisualMatch = (oracleEventsSum === BigInt(finalDrawnScaled));
+
+                return {
+                    mode: 'cumulative',
+                    q1Missing: false,
+                    statusType: 'reconciled',
+                    steps,
+                    initialBase: 0,
+                    sumPositives: fromScaledInt(sumPosScaled),
+                    sumNegatives: fromScaledInt(sumNegScaled),
+                    explainedVariance: fromScaledInt(runningScaled),
+                    unexplainedGap: 0,
+                    unexplainedPctOfBase: 0,
+                    unexplainedPctOfDelta: 0,
+                    netVariance: fromScaledInt(runningScaled),
+                    pctDelta: null,
+                    finalValue: fromScaledInt(finalDrawnScaled),
+                    calculatedEnd: fromScaledInt(runningScaled),
+                    invariantHolds: exactVisualMatch,
+                    oracleDeltaScaled: Number(BigInt(finalDrawnScaled) - oracleEventsSum)
+                };
+            }
+        }
+
+        function runEngineSelfTest() {
+            let allPassed = true;
+
+            const t1 = buildBridge({
+                analysisMode: 'bridge',
+                startPeriodValue: '1000.15',
+                endPeriodValue: '1250.05',
+                autoReconcileGap: false,
+                reconcileTolerancePct: 'strict',
+                events: [
+                    { label: 'A', value: 150.10, isSubtotal: false },
+                    { label: 'B', value: 199.80, isSubtotal: false },
+                    { label: 'C', value: -100.00, isSubtotal: false }
+                ]
+            });
+            if (!t1.invariantHolds || t1.unexplainedGap !== 0) allPassed = false;
+
+            const tGap = buildBridge({
+                analysisMode: 'bridge',
+                startPeriodValue: '1000',
+                endPeriodValue: '1300',
+                autoReconcileGap: false,
+                reconcileTolerancePct: 'delta:0.005',
+                events: [{ label: 'A', value: 299, isSubtotal: false }]
+            });
+            if (tGap.invariantHolds !== false || tGap.statusType !== 'reconciled_with_tol') allPassed = false;
+
+            for (let i = 0; i < 35; i++) {
+                const q1 = Math.round((Math.random() * 50000 - 10000) * 100) / 100;
+                let oracleBig = toBigIntScaled(q1);
+                const evs = [];
+                const numEv = 3 + (i % 6);
+                for (let j = 0; j < numEv; j++) {
+                    const v = Math.round((Math.random() * 4000 - 1800) * 100) / 100;
+                    oracleBig += toBigIntScaled(v);
+                    evs.push({ label: `E_${j}`, value: v, isSubtotal: false });
+                }
+                const expectedQ2 = Number(oracleBig) / Number(BIGINT_SCALE);
+                const res = buildBridge({
+                    analysisMode: 'bridge',
+                    startPeriodValue: String(q1),
+                    endPeriodValue: String(expectedQ2),
+                    autoReconcileGap: false,
+                    reconcileTolerancePct: 'strict',
+                    events: evs
+                });
+                if (!res.invariantHolds || toBigIntScaled(res.finalValue) !== oracleBig) {
+                    allPassed = false;
+                    break;
+                }
+            }
+
+            engineSelfTestPassed = allPassed;
+            return allPassed;
+        }
+
+        function parseLocaleNumberDetailed(rawInput, localeMode = 'pt-BR') {
+            if (rawInput === null || rawInput === undefined) {
+                return { value: NaN, valid: false, warning: null, error: 'Valor vazio' };
+            }
+            let str = String(rawInput).trim();
+            if (!str) {
+                return { value: NaN, valid: false, warning: null, error: 'Valor vazio' };
+            }
+
+            let sign = 1;
+            if (/^\(.*\)$/.test(str)) {
+                sign = -1;
+                str = str.slice(1, -1).trim();
+            }
+
+            str = str.replace(/[R$US€£%\s]/gi, '');
+
+            if (/[+-]$/.test(str)) {
+                if (str.endsWith('-')) sign *= -1;
+                str = str.slice(0, -1).trim();
+            } else if (/^[+-]/.test(str)) {
+                if (str.startsWith('-')) sign *= -1;
+                str = str.slice(1).trim();
+            }
+
+            if (!str || !/^\d[\d.,]*$/.test(str)) {
+                return { value: NaN, valid: false, warning: null, error: 'Formato numérico inválido' };
+            }
+
+            const hasDot = str.includes('.');
+            const hasComma = str.includes(',');
+            let warning = null;
+            let normalized = '';
+
+            const ptBrGroupedRegex = /^(\d{1,3}(\.\d{3})+|\d+)(,\d+)?$/;
+            const enUsGroupedRegex = /^(\d{1,3}(,\d{3})+|\d+)(\.\d+)?$/;
+            const singleDotAmbiguous = /^\d{1,3}\.\d{3}$/;
+            const singleCommaAmbiguous = /^\d{1,3},\d{3}$/;
+
+            if (localeMode === 'pt-BR') {
+                if (!ptBrGroupedRegex.test(str)) {
+                    const hint = hasDot && !hasComma
+                        ? 'Em PT-BR use vírgula para decimal (ex: 12,5) ou grupos de 3 dígitos para milhar (1.250).'
+                        : 'Agrupamento numérico inválido para PT-BR.';
+                    return { value: NaN, valid: false, warning: null, error: hint };
+                }
+                if (singleDotAmbiguous.test(str)) {
+                    warning = `Ambiguidade: "${str}" lido como milhar (${str.replace('.', '')}). Use vírgula se for decimal.`;
+                }
+                normalized = str.replace(/\./g, '').replace(',', '.');
+            } else if (localeMode === 'en-US') {
+                if (!enUsGroupedRegex.test(str)) {
+                    const hint = hasComma && !hasDot
+                        ? 'Em EN-US use ponto para decimal (ex: 12.5) ou grupos de 3 dígitos para milhar (1,250).'
+                        : 'Agrupamento numérico inválido para EN-US.';
+                    return { value: NaN, valid: false, warning: null, error: hint };
+                }
+                if (singleCommaAmbiguous.test(str)) {
+                    warning = `Ambiguidade: "${str}" lido como milhar (${str.replace(',', '')}). Use ponto se for decimal.`;
+                }
+                normalized = str.replace(/,/g, '');
+            } else {
+                if (hasDot && hasComma) {
+                    if (str.lastIndexOf(',') > str.lastIndexOf('.')) {
+                        if (!ptBrGroupedRegex.test(str)) {
+                            return { value: NaN, valid: false, warning: null, error: 'Separadores mistos inválidos (esperado 1.234,56).' };
+                        }
+                        normalized = str.replace(/\./g, '').replace(',', '.');
+                    } else {
+                        if (!enUsGroupedRegex.test(str)) {
+                            return { value: NaN, valid: false, warning: null, error: 'Separadores mistos inválidos (esperado 1,234.56).' };
+                        }
+                        normalized = str.replace(/,/g, '');
+                    }
+                } else if (hasComma) {
+                    if (singleCommaAmbiguous.test(str)) {
+                        warning = `Ambíguo no modo Auto: "${str}" assumido como decimal (${str.replace(',', '.')}). Selecione EN-US se for milhar.`;
+                        normalized = str.replace(',', '.');
+                    } else if (/^\d{1,3}(,\d{3}){2,}$/.test(str)) {
+                        normalized = str.replace(/,/g, '');
+                    } else if (/^\d+(,\d+)$/.test(str)) {
+                        normalized = str.replace(',', '.');
+                    } else {
+                        return { value: NaN, valid: false, warning: null, error: 'Formato com vírgula inválido.' };
+                    }
+                } else if (hasDot) {
+                    if (singleDotAmbiguous.test(str)) {
+                        warning = `Ambíguo no modo Auto: "${str}" assumido como milhar (${str.replace('.', '')}). Selecione EN-US se for decimal.`;
+                        normalized = str.replace(/\./g, '');
+                    } else if (/^\d{1,3}(\.\d{3}){2,}$/.test(str)) {
+                        normalized = str.replace(/\./g, '');
+                    } else if (/^\d+(\.\d+)$/.test(str)) {
+                        normalized = str;
+                    } else {
+                        return { value: NaN, valid: false, warning: null, error: 'Formato com ponto inválido.' };
+                    }
+                } else {
+                    normalized = str;
+                }
+            }
+
+            const num = parseFloat(normalized);
+            if (!Number.isFinite(num)) {
+                return { value: NaN, valid: false, warning: null, error: 'Número inválido' };
+            }
+            const signedVal = num === 0 ? 0 : sign * num;
+            return { value: signedVal, valid: true, warning, error: null };
+        }
+
+        function parseSpreadsheetLines(rawText, localeMode) {
+            const rawLines = String(rawText || '').split(/\r?\n/).map(l => l.trim()).filter(l => l !== '');
+            const rows = [];
+
+            rawLines.forEach((line, idx) => {
+                let labelPart = '';
+                let valPart = '';
+
+                if (line.includes('\t')) {
+                    const parts = line.split('\t').map(p => p.trim()).filter(p => p !== '');
+                    if (parts.length >= 2) {
+                        valPart = parts[parts.length - 1];
+                        labelPart = parts.slice(0, -1).join(' - ');
+                    } else {
+                        labelPart = parts[0] || '';
+                        valPart = '';
+                    }
+                } else if (line.includes(';')) {
+                    const parts = line.split(';').map(p => p.trim()).filter(p => p !== '');
+                    if (parts.length >= 2) {
+                        valPart = parts[parts.length - 1];
+                        labelPart = parts.slice(0, -1).join(' - ');
+                    } else {
+                        labelPart = parts[0] || '';
+                        valPart = '';
+                    }
+                } else {
+                    const match = line.match(/^(.+?)\s+([+-]?\(?R?\$?\s*\d[\d.,]*[+-]?\)?|\S+)$/i);
+                    if (match) {
+                        labelPart = match[1].trim().replace(/[,:]$/, '').trim();
+                        valPart = match[2].trim();
+                    } else {
+                        labelPart = line;
+                        valPart = '';
+                    }
+                }
+
+                if (idx === 0 && !/\d/.test(valPart)) {
+                    return;
+                }
+
+                const parsed = parseLocaleNumberDetailed(valPart, localeMode);
+                rows.push({
+                    lineNumber: idx + 1,
+                    raw: line,
+                    label: labelPart || `Linha ${idx + 1}`,
+                    rawValue: valPart,
+                    value: parsed.value,
+                    valid: Boolean(labelPart) && parsed.valid,
+                    warning: parsed.warning,
+                    error: !labelPart ? 'Rótulo ausente' : parsed.error
+                });
+            });
+
+            const isBridge = appState.analysisMode === 'bridge';
+            const useEndpoints = bulkIncludeEndpoints.checked && rows.length >= 3;
+
+            rows.forEach((r, physicalIdx) => {
+                if (isBridge && useEndpoints) {
+                    if (physicalIdx === 0) r.role = 'Q1';
+                    else if (physicalIdx === rows.length - 1) r.role = 'Q2';
+                    else r.role = 'Evento';
+                } else {
+                    r.role = 'Etapa';
+                }
+            });
+
+            return rows;
+        }
+
+        function updateLiveImportPreview() {
+            const rawText = bulkPasteInput.value;
+            const localeMode = importLocaleSelect.value;
+            const rows = parseSpreadsheetLines(rawText, localeMode);
+            const validRows = rows.filter(r => r.valid);
+            const errorRows = rows.filter(r => !r.valid);
+            const warnRows = rows.filter(r => r.valid && r.warning);
+
+            previewRowCount.textContent = `${validRows.length} de ${rows.length} linhas válidas` + (warnRows.length > 0 ? ` (${warnRows.length} aviso${warnRows.length > 1 ? 's' : ''})` : '');
+
+            if (rows.length === 0) {
+                previewControlSum.textContent = 'Aguardando dados';
+                previewBridgeCheck.classList.add('hidden');
+                previewTableContainer.innerHTML = '<p class="text-slate-400 italic py-2 text-center">Cole seus dados acima para conferir cada linha antes de aplicar.</p>';
+                applyBulkBtn.disabled = true;
+                return;
+            }
+
+            applyBulkBtn.disabled = errorRows.length > 0 || validRows.length === 0;
+
+            const isBridge = appState.analysisMode === 'bridge';
+            const useEndpoints = bulkIncludeEndpoints.checked && rows.length >= 3;
+
+            if (errorRows.length > 0) {
+                previewControlSum.className = 'font-mono text-rose-600 dark:text-rose-400 font-bold';
+                previewControlSum.textContent = `✕ ${errorRows.length} erro(s) bloqueando importação`;
+                previewBridgeCheck.classList.remove('hidden');
+                previewBridgeCheck.className = 'text-[10px] font-mono px-2 py-1 rounded bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800';
+                previewBridgeCheck.textContent = `Corrija a(s) linha(s) inválida(s) antes de importar.`;
+            } else if (isBridge && useEndpoints) {
+                const q1Scaled = toScaledInt(rows[0].value);
+                const q2Scaled = toScaledInt(rows[rows.length - 1].value);
+                let evSumScaled = 0;
+                for (let i = 1; i < rows.length - 1; i++) {
+                    evSumScaled += toScaledInt(rows[i].value);
+                }
+                const calcQ2Scaled = q1Scaled + evSumScaled;
+                const diffScaled = q2Scaled - calcQ2Scaled;
+
+                previewControlSum.className = diffScaled === 0
+                    ? 'font-mono text-emerald-700 dark:text-emerald-400 font-bold'
+                    : 'font-mono text-amber-700 dark:text-amber-400 font-bold';
+                previewControlSum.textContent = diffScaled === 0
+                    ? '✓ Ponte Fechada (Dif: 0)'
+                    : `⚠ Diferença Q2: ${formatExactDifference(fromScaledInt(diffScaled))}`;
+
+                previewBridgeCheck.classList.remove('hidden');
+                previewBridgeCheck.className = 'text-[10px] font-mono px-2 py-1 rounded bg-slate-50 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+                previewBridgeCheck.textContent = `Q1 (${formatNumber(fromScaledInt(q1Scaled))}) + ΣEventos (${formatNumber(fromScaledInt(evSumScaled), true)}) = ${formatNumber(fromScaledInt(calcQ2Scaled))} vs Q2 (${formatNumber(fromScaledInt(q2Scaled))})`;
+            } else {
+                let sumScaled = 0;
+                validRows.forEach(r => { sumScaled += toScaledInt(r.value); });
+                previewControlSum.className = 'font-mono text-emerald-700 dark:text-emerald-400';
+                previewControlSum.textContent = `Saldo Acumulado: ${formatNumber(fromScaledInt(sumScaled), true)}`;
+                previewBridgeCheck.classList.add('hidden');
+            }
+
+            let html = '<table class="w-full text-left border-collapse">';
+            rows.forEach((r) => {
+                const roleColors = {
+                    'Q1': 'bg-blue-100 text-blue-700 dark:bg-blue-900/70 dark:text-blue-200',
+                    'Q2': 'bg-blue-100 text-blue-700 dark:bg-blue-900/70 dark:text-blue-200',
+                    'Evento': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+                    'Etapa': 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                };
+                const roleBadge = `<span class="px-1.5 py-0.5 ${roleColors[r.role] || roleColors.Etapa} rounded text-[9px] font-bold">${escapeHtml(r.role)}</span>`;
+
+                let statusHtml = '';
+                if (!r.valid) {
+                    statusHtml = `<span class="text-rose-600 dark:text-rose-400 font-bold" title="${escapeHtml(r.error)}">✕ ${escapeHtml(r.rawValue || 'Vazio')}</span>`;
+                } else if (r.warning) {
+                    statusHtml = `<span class="text-amber-600 dark:text-amber-400 font-bold" title="${escapeHtml(r.warning)}">⚠ ${escapeHtml(formatNumber(r.value, r.role !== 'Q1' && r.role !== 'Q2'))}</span>`;
+                } else {
+                    statusHtml = `<span class="text-slate-700 dark:text-slate-200">${escapeHtml(formatNumber(r.value, r.role !== 'Q1' && r.role !== 'Q2'))}</span>`;
+                }
+
+                html += `
+                    <tr class="border-b border-slate-100 dark:border-slate-800">
+                        <td class="py-1 pr-1">${roleBadge}</td>
+                        <td class="py-1 px-1 truncate max-w-[130px]" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</td>
+                        <td class="py-1 pl-1 text-right font-mono font-semibold">${statusHtml}</td>
+                    </tr>
+                `;
+                if (!r.valid && r.error) {
+                    html += `
+                        <tr class="bg-rose-50/70 dark:bg-rose-950/30">
+                            <td colspan="3" class="px-2 py-0.5 text-[10px] text-rose-700 dark:text-rose-300">↳ Linha ${r.lineNumber}: ${escapeHtml(r.error)}</td>
+                        </tr>
+                    `;
+                } else if (r.valid && r.warning) {
+                    html += `
+                        <tr class="bg-amber-50/70 dark:bg-amber-950/30">
+                            <td colspan="3" class="px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">↳ Linha ${r.lineNumber}: ${escapeHtml(r.warning)}</td>
+                        </tr>
+                    `;
+                }
+            });
+            html += '</table>';
+            previewTableContainer.innerHTML = html;
+        }
+
+        bulkPasteInput.addEventListener('input', updateLiveImportPreview);
+        importLocaleSelect.addEventListener('change', () => {
+            appState.importLocale = importLocaleSelect.value;
+            updateLiveImportPreview();
+            saveStateToStorage();
+        });
+        bulkIncludeEndpoints.addEventListener('change', updateLiveImportPreview);
+
+        function applyBulkImport() {
+            const rows = parseSpreadsheetLines(bulkPasteInput.value, importLocaleSelect.value);
+            const errorRows = rows.filter(r => !r.valid);
+
+            if (rows.length === 0) {
+                showToast('Nenhuma linha encontrada para importar.', false);
+                return;
+            }
+
+            if (errorRows.length > 0) {
+                showToast(`Importação bloqueada: corrija ${errorRows.length} linha(s) com erro na prévia.`, false);
+                return;
+            }
+
+            pushUndoSnapshot('Importação de Planilha');
+
+            const isBridge = appState.analysisMode === 'bridge';
+            const useEndpoints = bulkIncludeEndpoints.checked && rows.length >= 3;
+
+            if (isBridge && useEndpoints) {
+                const first = rows[0];
+                const last = rows[rows.length - 1];
+                const middle = rows.slice(1, -1);
+
+                appState.startPeriodLabel = first.label;
+                appState.startPeriodValue = String(first.value);
+                appState.endPeriodLabel = last.label;
+                appState.endPeriodValue = String(last.value);
+                appState.events = middle.map((r, i) => ({
+                    id: `imp_${Date.now()}_${i}`,
+                    label: r.label,
+                    value: r.value,
+                    isSubtotal: false
+                }));
+            } else {
+                appState.events = rows.map((r, i) => ({
+                    id: `imp_${Date.now()}_${i}`,
+                    label: r.label,
+                    value: r.value,
+                    isSubtotal: false
+                }));
+            }
+
+            syncInputsFromState();
+            renderVisualEventEditor();
+            saveStateToStorage();
+            updateApplicationView();
+            showToast(`Importadas ${rows.length} linhas com sucesso!`, true);
+        }
+
+        applyBulkBtn.addEventListener('click', applyBulkImport);
+
+        fillBulkSampleBtn.addEventListener('click', () => {
+            importLocaleSelect.value = 'pt-BR';
+            appState.importLocale = 'pt-BR';
+            bulkPasteInput.value = [
+                'Categoria\tValor (R$ Mil)',
+                'EBITDA Q1 2026\t1.850',
+                'Expansão de Volume, Brasil\t420',
+                'Reajuste de Preços\t190',
+                'Ganho de Eficiência\t145',
+                'Inflação de Insumos\t-210',
+                'Despesas com Marketing\t-95',
+                'EBITDA Q2 2026\t2.300'
+            ].join('\n');
+            updateLiveImportPreview();
+        });
+
+        function renderVisualEventEditor() {
+            eventsListContainer.innerHTML = '';
+            const events = appState.events || [];
+
+            if (events.length === 0) {
+                eventsListContainer.innerHTML = '<p class="text-xs text-slate-400 italic py-3 text-center">Nenhuma etapa cadastrada. Adicione abaixo.</p>';
+                return;
+            }
+
+            events.forEach((ev, idx) => {
+                const row = document.createElement('div');
+                row.className = 'grid grid-cols-12 gap-1.5 items-center bg-white dark:bg-slate-800 p-1.5 rounded-md border border-slate-200 dark:border-slate-700 shadow-sm';
+
+                const isSub = Boolean(ev.isSubtotal);
+                const valDisplay = isSub ? '=' : String(ev.value ?? 0);
+
+                row.innerHTML = `
+                    <div class="col-span-6 flex items-center gap-1">
+                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${isSub ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'}">${isSub ? '=' : idx + 1}</span>
+                        <input type="text" data-idx="${idx}" data-field="label" value="${escapeHtml(ev.label)}" placeholder="Nome da etapa" class="w-full px-2 py-1 text-xs bg-transparent border border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 focus:bg-white dark:focus:bg-slate-900 rounded focus:outline-none">
+                    </div>
+                    <div class="col-span-4">
+                        ${isSub
+                            ? `<div class="px-2 py-1 text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 text-right italic">Subtotal Auto</div>`
+                            : `<input type="number" step="any" data-idx="${idx}" data-field="value" value="${escapeHtml(valDisplay)}" class="w-full px-2 py-1 text-xs font-mono text-right bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded focus:outline-none focus:ring-1 focus:ring-blue-500">`
+                        }
+                    </div>
+                    <div class="col-span-2 flex items-center justify-end gap-0.5">
+                        <button type="button" data-action="up" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''} title="Mover para cima" class="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white disabled:opacity-25">↑</button>
+                        <button type="button" data-action="down" data-idx="${idx}" ${idx === events.length - 1 ? 'disabled' : ''} title="Mover para baixo" class="p-1 text-slate-400 hover:text-slate-700 dark:hover:text-white disabled:opacity-25">↓</button>
+                        <button type="button" data-action="delete" data-idx="${idx}" title="Remover etapa" class="p-1 text-rose-400 hover:text-rose-600 font-bold">✕</button>
+                    </div>
+                `;
+                eventsListContainer.appendChild(row);
+            });
+
+            eventsListContainer.querySelectorAll('input').forEach(inp => {
+                inp.addEventListener('input', (e) => {
+                    const i = parseInt(e.target.getAttribute('data-idx'), 10);
+                    const field = e.target.getAttribute('data-field');
+                    if (!appState.events[i]) return;
+                    if (field === 'label') {
+                        appState.events[i].label = e.target.value;
+                    } else if (field === 'value') {
+                        const v = parseFloat(e.target.value);
+                        appState.events[i].value = Number.isFinite(v) ? v : 0;
+                    }
+                    saveStateToStorage();
+                    updateApplicationView();
+                });
+            });
+
+            eventsListContainer.querySelectorAll('button[data-action]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const i = parseInt(e.currentTarget.getAttribute('data-idx'), 10);
+                    const action = e.currentTarget.getAttribute('data-action');
+                    if (action === 'up' && i > 0) {
+                        const tmp = appState.events[i - 1];
+                        appState.events[i - 1] = appState.events[i];
+                        appState.events[i] = tmp;
+                    } else if (action === 'down' && i < appState.events.length - 1) {
+                        const tmp = appState.events[i + 1];
+                        appState.events[i + 1] = appState.events[i];
+                        appState.events[i] = tmp;
+                    } else if (action === 'delete') {
+                        pushUndoSnapshot(`Exclusão de "${appState.events[i].label}"`);
+                        appState.events.splice(i, 1);
+                        showToast('Etapa removida.', true);
+                    }
+                    renderVisualEventEditor();
+                    saveStateToStorage();
+                    updateApplicationView();
+                });
+            });
+        }
+
+        addEventRowBtn.addEventListener('click', () => {
+            appState.events.push({
+                id: `ev_${Date.now()}`,
+                label: `Novo Impacto ${appState.events.length + 1}`,
+                value: 50,
+                isSubtotal: false
+            });
+            renderVisualEventEditor();
+            saveStateToStorage();
+            updateApplicationView();
+        });
+
+        addSubtotalRowBtn.addEventListener('click', () => {
+            appState.events.push({
+                id: `sub_${Date.now()}`,
+                label: 'Subtotal Parcial',
+                value: 0,
+                isSubtotal: true
+            });
+            renderVisualEventEditor();
+            saveStateToStorage();
+            updateApplicationView();
+        });
+
+        sortDescBtn.addEventListener('click', () => {
+            pushUndoSnapshot('Ordenação Maior ➔ Menor');
+            const result = [];
+            let bucket = [];
+            const flushBucket = () => {
+                bucket.sort((a, b) => b.value - a.value);
+                result.push(...bucket);
+                bucket = [];
+            };
+            appState.events.forEach(ev => {
+                if (ev.isSubtotal) {
+                    flushBucket();
+                    result.push(ev);
+                } else {
+                    bucket.push(ev);
+                }
+            });
+            flushBucket();
+            appState.events = result;
+            renderVisualEventEditor();
+            saveStateToStorage();
+            updateApplicationView();
+            showToast('Impactos ordenados do maior para o menor!', true);
+        });
+
+        reverseOrderBtn.addEventListener('click', () => {
+            pushUndoSnapshot('Inversão de Ordem');
+            appState.events.reverse();
+            renderVisualEventEditor();
+            saveStateToStorage();
+            updateApplicationView();
+            showToast('Ordem das etapas invertida!', true);
+        });
+
+        function updateLegendSwatches(palette) {
+            const swatchBase = document.getElementById('legendSwatchBase');
+            const swatchPos = document.getElementById('legendSwatchPos');
+            const swatchNeg = document.getElementById('legendSwatchNeg');
+            const swatchAdj = document.getElementById('legendSwatchAdj');
+            if (swatchBase) swatchBase.style.backgroundColor = palette.baseBg;
+            if (swatchPos) swatchPos.style.backgroundColor = palette.posBg;
+            if (swatchNeg) swatchNeg.style.backgroundColor = palette.negBg;
+            if (swatchAdj) swatchAdj.style.backgroundColor = palette.adjBg;
+        }
+
+        function renderExecutiveSummaryTable(bridge) {
+            executiveTableBody.innerHTML = '';
+            const baseVal = bridge.initialBase;
+
+            bridge.steps.forEach((s) => {
+                const tr = document.createElement('tr');
+                const isPillar = s.isBase || s.isTotal || s.isSubtotal;
+                tr.className = isPillar
+                    ? 'bg-slate-50/90 dark:bg-slate-800/40 font-bold text-slate-900 dark:text-white'
+                    : 'hover:bg-slate-50/60 dark:hover:bg-slate-800/30 text-slate-700 dark:text-slate-300';
+
+                let badgeHtml = '';
+                let valClass = 'text-slate-800 dark:text-slate-100';
+
+                if (s.isBase && !s.isTotal) {
+                    badgeHtml = `<span class="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded text-[10px] font-bold">Base Inicial</span>`;
+                } else if (s.isSubtotal) {
+                    badgeHtml = `<span class="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 rounded text-[10px] font-bold">Subtotal (=)</span>`;
+                } else if (s.isTotal) {
+                    badgeHtml = `<span class="px-2 py-0.5 bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 rounded text-[10px] font-bold">Base Final</span>`;
+                } else if (s.isAdjustment) {
+                    badgeHtml = `<span class="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300 rounded text-[10px] font-bold">Plug / Não Explicado</span>`;
+                    valClass = 'text-amber-600 dark:text-amber-400 font-bold';
+                } else if (s.diff >= 0) {
+                    badgeHtml = `<span class="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 rounded text-[10px] font-bold">Entrada (+)</span>`;
+                    valClass = 'text-emerald-600 dark:text-emerald-400 font-semibold';
+                } else {
+                    badgeHtml = `<span class="px-2 py-0.5 bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded text-[10px] font-bold">Saída (-)</span>`;
+                    valClass = 'text-rose-600 dark:text-rose-400 font-semibold';
+                }
+
+                const valToDisplay = isPillar ? formatNumber(s.end, false) : formatNumber(s.diff, true);
+                const rawForPct = isPillar ? s.end : s.diff;
+                const pctStr = baseVal !== 0
+                    ? formatPercent(rawForPct / Math.abs(baseVal), !isPillar)
+                    : '—';
+
+                tr.innerHTML = `
+                    <td class="py-2.5 px-4">${escapeHtml(s.label)}</td>
+                    <td class="py-2.5 px-4">${badgeHtml}</td>
+                    <td class="py-2.5 px-4 text-right font-mono ${valClass}">${escapeHtml(valToDisplay)}</td>
+                    <td class="py-2.5 px-4 text-right font-mono text-slate-500 dark:text-slate-400">${escapeHtml(pctStr)}</td>
+                    <td class="py-2.5 px-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100">${escapeHtml(formatNumber(s.end, false))}</td>
+                `;
+                executiveTableBody.appendChild(tr);
+            });
+        }
+
+        function computeAxisBounds(steps, enableAxisBreak, showDeltaBracket) {
+            if (!steps || steps.length === 0) {
+                return { ySuggestedMin: 0, ySuggestedMax: 100, axisBreakActive: false, effectiveMin: 0 };
+            }
+
+            let minVal = Infinity;
+            let maxVal = -Infinity;
+            let lowestFloatingPoint = Infinity;
+
+            steps.forEach(s => {
+                minVal = Math.min(minVal, s.start, s.end);
+                maxVal = Math.max(maxVal, s.start, s.end);
+                if (!s.isBase && !s.isTotal && !s.isSubtotal) {
+                    lowestFloatingPoint = Math.min(lowestFloatingPoint, s.start, s.end);
+                } else {
+                    lowestFloatingPoint = Math.min(lowestFloatingPoint, s.end);
+                }
+            });
+
+            let axisBreakActive = false;
+            let effectiveMin = 0;
+
+            if (enableAxisBreak && lowestFloatingPoint > 0 && maxVal > 0) {
+                const span = maxVal - lowestFloatingPoint;
+                if (lowestFloatingPoint > span * 0.8) {
+                    axisBreakActive = true;
+                    effectiveMin = Math.max(0, lowestFloatingPoint - Math.max(span * 0.35, maxVal * 0.05));
+                }
+            }
+
+            const baseMin = axisBreakActive ? effectiveMin : Math.min(0, minVal);
+            const range = Math.max(Math.abs(maxVal - baseMin), 10);
+            const topPadFactor = showDeltaBracket ? 0.28 : 0.16;
+            const bottomPadFactor = minVal < 0 ? 0.16 : 0.04;
+
+            return {
+                ySuggestedMin: axisBreakActive ? effectiveMin : (minVal < 0 ? minVal - range * bottomPadFactor : 0),
+                ySuggestedMax: maxVal + range * topPadFactor,
+                axisBreakActive,
+                effectiveMin
+            };
+        }
+
+        function createDiagonalHatchPattern(ctx, bgColor, stripeColor) {
+            const pCanvas = document.createElement('canvas');
+            pCanvas.width = 12;
+            pCanvas.height = 12;
+            const pCtx = pCanvas.getContext('2d');
+
+            pCtx.fillStyle = bgColor;
+            pCtx.fillRect(0, 0, 12, 12);
+
+            pCtx.strokeStyle = stripeColor;
+            pCtx.lineWidth = 3;
+            pCtx.beginPath();
+            pCtx.moveTo(-2, 10);
+            pCtx.lineTo(10, -2);
+            pCtx.moveTo(2, 14);
+            pCtx.lineTo(14, 2);
+            pCtx.stroke();
+
+            return ctx.createPattern(pCanvas, 'repeat');
+        }
+
+        function createChartJSConfig(bridge, optionsOverride = {}) {
+            const steps = bridge.steps;
+            const isDark = optionsOverride.forceLightMode ? false : Boolean(appState.darkMode);
+            const palette = COLOR_PALETTES[appState.colorPalette] || COLOR_PALETTES.corporate;
+            const bounds = computeAxisBounds(steps, appState.enableAxisBreak, appState.showDeltaBracket);
+
+            const bgColors = [];
+            const borderColors = [];
+            const floatingData = [];
+
+            const hatchPattern = createDiagonalHatchPattern(
+                ctx,
+                isDark ? 'rgba(245, 158, 11, 0.28)' : 'rgba(254, 243, 199, 0.95)',
+                palette.adjBorder
+            );
+
+            steps.forEach((s) => {
+                const startVal = (bounds.axisBreakActive && (s.isBase || s.isTotal || s.isSubtotal))
+                    ? bounds.effectiveMin
+                    : s.start;
+                floatingData.push([startVal, s.end]);
+
+                if (s.isBase || s.isTotal || s.isSubtotal) {
+                    bgColors.push(palette.baseBg);
+                    borderColors.push(palette.baseBorder);
+                } else if (s.isAdjustment) {
+                    bgColors.push(hatchPattern || palette.adjBg);
+                    borderColors.push(palette.adjBorder);
+                } else if (s.diff >= 0) {
+                    bgColors.push(palette.posBg);
+                    borderColors.push(palette.posBorder);
+                } else {
+                    bgColors.push(palette.negBg);
+                    borderColors.push(palette.negBorder);
+                }
+            });
+
+            const waterfallCustomPlugin = {
+                id: 'waterfallCustomPlugin',
+                beforeDraw(chart) {
+                    if (optionsOverride.forceLightMode) {
+                        const { ctx: c, width, height } = chart;
+                        c.save();
+                        c.fillStyle = '#ffffff';
+                        c.fillRect(0, 0, width, height);
+                        c.restore();
+                    }
+                },
+                afterDatasetsDraw(chart) {
+                    const { ctx: c, scales: { x, y } } = chart;
+                    const meta = chart.getDatasetMeta(0);
+                    if (!meta || !meta.data || meta.data.length === 0) return;
+
+                    c.save();
+
+                    if (appState.showConnectors && steps.length > 1) {
+                        c.strokeStyle = isDark ? 'rgba(148, 163, 184, 0.45)' : 'rgba(100, 116, 139, 0.55)';
+                        c.lineWidth = 1.5;
+                        c.setLineDash([4, 4]);
+
+                        for (let i = 0; i < steps.length - 1; i++) {
+                            const currBar = meta.data[i];
+                            const nextBar = meta.data[i + 1];
+                            if (!currBar || !nextBar) continue;
+
+                            const connY = y.getPixelForValue(steps[i].end);
+                            const startX = currBar.x + currBar.width / 2;
+                            const endX = nextBar.x - nextBar.width / 2;
+
+                            c.beginPath();
+                            c.moveTo(startX, connY);
+                            c.lineTo(endX, connY);
+                            c.stroke();
+                        }
+                        c.setLineDash([]);
+                    }
+
+                    if (appState.showDataLabels) {
+                        const baseFontSize = optionsOverride.fontSize ? Math.round(optionsOverride.fontSize * 0.85) : 11;
+                        c.font = `600 ${baseFontSize}px Inter, sans-serif`;
+                        c.textAlign = 'center';
+
+                        steps.forEach((s, i) => {
+                            const bar = meta.data[i];
+                            if (!bar) return;
+
+                            const isPillar = s.isBase || s.isTotal || s.isSubtotal;
+                            let txt = isPillar ? formatNumber(s.end, false) : formatNumber(s.diff, true);
+
+                            if (appState.showPercentInLabels && !isPillar && bridge.initialBase !== 0) {
+                                const pct = formatPercent(s.diff / Math.abs(bridge.initialBase), true);
+                                txt += ` (${pct})`;
+                            }
+
+                            if (isPillar) {
+                                c.fillStyle = isDark ? palette.baseTextDark : palette.baseText;
+                            } else if (s.isAdjustment) {
+                                c.fillStyle = isDark ? palette.adjTextDark : palette.adjText;
+                            } else if (s.diff >= 0) {
+                                c.fillStyle = isDark ? palette.posTextDark : palette.posText;
+                            } else {
+                                c.fillStyle = isDark ? palette.negTextDark : palette.negText;
+                            }
+
+                            const topY = Math.min(bar.y, bar.base);
+                            const bottomY = Math.max(bar.y, bar.base);
+                            const isNegativeStep = !isPillar && s.diff < 0;
+                            const labelY = isNegativeStep ? (bottomY + baseFontSize + 5) : (topY - 7);
+
+                            c.fillText(txt, bar.x, labelY);
+                        });
+                    }
+
+                    if (appState.showDeltaBracket && steps.length >= 2) {
+                        const firstBar = meta.data[0];
+                        const lastBar = meta.data[steps.length - 1];
+                        if (firstBar && lastBar) {
+                            const highestPixelY = Math.min(...meta.data.map(b => Math.min(b.y, b.base)));
+                            const bracketY = Math.max(chart.chartArea.top + 16, highestPixelY - 28);
+
+                            const startTopY = Math.min(firstBar.y, firstBar.base) - 18;
+                            const endTopY = Math.min(lastBar.y, lastBar.base) - 18;
+
+                            c.strokeStyle = isDark ? '#94a3b8' : '#475569';
+                            c.lineWidth = 1.5;
+                            c.beginPath();
+                            c.moveTo(firstBar.x, Math.max(bracketY + 8, startTopY));
+                            c.lineTo(firstBar.x, bracketY);
+                            c.lineTo(lastBar.x, bracketY);
+                            c.lineTo(lastBar.x, Math.max(bracketY + 8, endTopY));
+                            c.stroke();
+
+                            const deltaValStr = formatNumber(bridge.netVariance, true);
+                            const deltaPctStr = bridge.pctDelta !== null ? ` (${formatPercent(bridge.pctDelta, true)})` : '';
+                            const pillText = `Δ Total: ${deltaValStr}${deltaPctStr}`;
+
+                            const pillFontSize = optionsOverride.fontSize ? Math.round(optionsOverride.fontSize * 0.85) : 11;
+                            c.font = `700 ${pillFontSize}px Inter, sans-serif`;
+                            const textWidth = c.measureText(pillText).width;
+                            const midX = (firstBar.x + lastBar.x) / 2;
+                            const pillW = textWidth + 18;
+                            const pillH = pillFontSize + 10;
+
+                            c.fillStyle = isDark ? '#1e293b' : '#f1f5f9';
+                            c.strokeStyle = isDark ? '#475569' : '#cbd5e1';
+                            c.beginPath();
+                            c.roundRect(midX - pillW / 2, bracketY - pillH / 2, pillW, pillH, 999);
+                            c.fill();
+                            c.stroke();
+
+                            c.fillStyle = bridge.netVariance >= 0
+                                ? (isDark ? palette.posTextDark : palette.posText)
+                                : (isDark ? palette.negTextDark : palette.negText);
+                            c.textAlign = 'center';
+                            c.textBaseline = 'middle';
+                            c.fillText(pillText, midX, bracketY);
+                            c.textBaseline = 'alphabetic';
+                        }
+                    }
+
+                    if (bounds.axisBreakActive) {
+                        const axisX = y.right;
+                        const breakY = y.bottom - 10;
+                        c.strokeStyle = isDark ? '#fbbf24' : '#d97706';
+                        c.lineWidth = 2;
+                        c.beginPath();
+                        c.moveTo(axisX - 7, breakY - 4);
+                        c.lineTo(axisX + 7, breakY - 10);
+                        c.moveTo(axisX - 7, breakY + 2);
+                        c.lineTo(axisX + 7, breakY - 4);
+                        c.stroke();
+                    }
+
+                    c.restore();
+                }
+            };
+
+            const textColor = isDark ? '#cbd5e1' : '#334155';
+            const gridColor = isDark ? 'rgba(51, 65, 85, 0.45)' : 'rgba(226, 232, 240, 0.9)';
+
+            return {
+                type: 'bar',
+                data: {
+                    labels: steps.map(s => s.label),
+                    datasets: [{
+                        label: appState.title,
+                        data: floatingData,
+                        backgroundColor: bgColors,
+                        borderColor: borderColors,
+                        borderWidth: 1.5,
+                        borderRadius: 5,
+                        borderSkipped: false,
+                        maxBarThickness: optionsOverride.maxBarThickness || 64
+                    }]
+                },
+                options: {
+                    responsive: optionsOverride.responsive !== undefined ? optionsOverride.responsive : true,
+                    maintainAspectRatio: false,
+                    devicePixelRatio: optionsOverride.devicePixelRatio || Math.min(window.devicePixelRatio || 2, 2),
+                    animation: optionsOverride.disableAnimation ? false : { duration: 220 },
+                    layout: {
+                        padding: { top: 26, right: 16, bottom: 8, left: 8 }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: Boolean(appState.title),
+                            text: appState.title,
+                            color: isDark ? '#f8fafc' : '#0f172a',
+                            font: {
+                                family: 'Inter, sans-serif',
+                                size: optionsOverride.titleFontSize || 16,
+                                weight: '700'
+                            },
+                            padding: { bottom: 18 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label(context) {
+                                    const s = steps[context.dataIndex];
+                                    if (!s) return '';
+                                    if (s.isBase || s.isTotal || s.isSubtotal) {
+                                        return ` Nível: ${formatNumber(s.end, false)}`;
+                                    }
+                                    const pctStr = bridge.initialBase !== 0
+                                        ? ` (${formatPercent(s.diff / Math.abs(bridge.initialBase), true)} s/ Base)`
+                                        : '';
+                                    return [
+                                        ` Impacto: ${formatNumber(s.diff, true)}${pctStr}`,
+                                        ` Acumulado: ${formatNumber(s.start, false)} ➔ ${formatNumber(s.end, false)}`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: textColor,
+                                font: { family: 'Inter, sans-serif', size: optionsOverride.fontSize || 11, weight: '600' },
+                                maxRotation: 30,
+                                minRotation: 0
+                            },
+                            title: {
+                                display: Boolean(appState.xAxisName),
+                                text: appState.xAxisName,
+                                color: textColor,
+                                font: { family: 'Inter, sans-serif', size: optionsOverride.fontSize || 11, weight: '600' }
+                            }
+                        },
+                        y: {
+                            min: bounds.ySuggestedMin,
+                            max: bounds.ySuggestedMax,
+                            grid: { color: gridColor },
+                            ticks: {
+                                color: textColor,
+                                font: { family: 'Inter, sans-serif', size: optionsOverride.fontSize || 11 },
+                                callback(value) {
+                                    return formatNumber(value, false);
+                                }
+                            },
+                            title: {
+                                display: Boolean(appState.yAxisName),
+                                text: appState.yAxisName,
+                                color: textColor,
+                                font: { family: 'Inter, sans-serif', size: optionsOverride.fontSize || 11, weight: '600' }
+                            }
+                        }
+                    }
+                },
+                plugins: [waterfallCustomPlugin]
+            };
+        }
+
+        function updateApplicationView() {
+            const bridge = buildBridge(appState);
+            lastBridgeResult = bridge;
+
+            const palette = COLOR_PALETTES[appState.colorPalette] || COLOR_PALETTES.corporate;
+            updateLegendSwatches(palette);
+
+            if (bridge.q1Missing) {
+                q1EmptyWarning.classList.remove('hidden');
+                startPeriodValueInput.classList.add('border-rose-500', 'ring-1', 'ring-rose-500');
+            } else {
+                q1EmptyWarning.classList.add('hidden');
+                startPeriodValueInput.classList.remove('border-rose-500', 'ring-1', 'ring-rose-500');
+            }
+
+            if (bridge.mode === 'bridge') {
+                const q1Name = escapeHtml(appState.startPeriodLabel || 'Q1');
+                const q2Name = escapeHtml(appState.endPeriodLabel || 'Q2');
+
+                if (bridge.statusType === 'auto') {
+                    bridgeStatusAlert.className = 'p-2.5 rounded-md text-[11px] font-medium bg-blue-100/70 dark:bg-blue-950/60 text-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-800';
+                    bridgeStatusAlert.innerHTML = `<strong>Cálculo Automático:</strong> ${q2Name} calculado em <strong>${escapeHtml(formatNumber(bridge.finalValue))}</strong> (Δ líquido de <strong>${escapeHtml(formatNumber(bridge.netVariance, true))}</strong>).`;
+                } else if (bridge.statusType === 'reconciled') {
+                    bridgeStatusAlert.className = 'p-2.5 rounded-md text-[11px] font-medium bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-900 dark:text-emerald-200 border border-emerald-300 dark:border-emerald-800';
+                    bridgeStatusAlert.innerHTML = `✓ <strong>Ponte Reconciliada (Exata):</strong> Os eventos explicam 100% da variação entre ${q1Name} e ${q2Name} (${escapeHtml(formatNumber(bridge.explainedVariance, true))}).`;
+                } else if (bridge.statusType === 'reconciled_with_tol') {
+                    bridgeStatusAlert.className = 'p-2.5 rounded-md text-[11px] font-medium bg-amber-100/80 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800';
+                    bridgeStatusAlert.innerHTML = `≈ <strong>Ponte fecha com diferença de ${escapeHtml(formatExactDifference(bridge.unexplainedGap))}</strong> (dentro da tolerância configurada; equivale a ${escapeHtml(formatPercent(bridge.unexplainedPctOfDelta, false))} de |Δ|).`;
+                } else if (bridge.statusType === 'plugged') {
+                    bridgeStatusAlert.className = 'p-2.5 rounded-md text-[11px] font-medium bg-amber-100/80 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800';
+                    bridgeStatusAlert.innerHTML = `⚠️ <strong>Plug Ativo (${escapeHtml(formatExactDifference(bridge.unexplainedGap))}):</strong> Equivale a <strong>${escapeHtml(formatPercent(bridge.unexplainedPctOfDelta, false))} da variação</strong> (${escapeHtml(formatPercent(bridge.unexplainedPctOfBase, false))} da base). Barra hachurada inserida.`;
+                } else {
+                    bridgeStatusAlert.className = 'p-2.5 rounded-md text-[11px] font-medium bg-rose-100/80 dark:bg-rose-950/60 text-rose-900 dark:text-rose-200 border border-rose-300 dark:border-rose-800';
+                    bridgeStatusAlert.innerHTML = `🚨 <strong>Ponte Desbalanceada em ${escapeHtml(formatExactDifference(bridge.unexplainedGap))}:</strong> A soma atinge <strong>${escapeHtml(formatNumber(bridge.calculatedEnd))}</strong>, mas ${q2Name} exige <strong>${escapeHtml(formatNumber(bridge.finalValue))}</strong>.`;
+                }
+
+                kpiStartTitle.textContent = appState.startPeriodLabel || 'Base Q1';
+                kpiEndTitle.textContent = appState.endPeriodLabel || 'Base Q2';
+            } else {
+                kpiStartTitle.textContent = 'Ponto de Partida';
+                kpiEndTitle.textContent = appState.totalBarLabel || 'Saldo Final';
+            }
+
+            kpiInitial.textContent = formatNumber(bridge.initialBase, false);
+            kpiPositive.textContent = formatNumber(bridge.sumPositives, true);
+            kpiNegative.textContent = formatNumber(bridge.sumNegatives, false);
+            kpiNetVariance.textContent = bridge.pctDelta !== null
+                ? `${formatNumber(bridge.netVariance, true)} (${formatPercent(bridge.pctDelta, true)})`
+                : formatNumber(bridge.netVariance, true);
+
+            const hasUnexplained = Math.abs(bridge.unexplainedGap) > 0.00001;
+            kpiUnexplained.textContent = `${formatExactDifference(bridge.unexplainedGap)} (${formatPercent(bridge.unexplainedPctOfDelta, false)} Δ)`;
+            kpiUnexplainedCard.className = hasUnexplained
+                ? 'bg-amber-50 dark:bg-amber-950/40 p-3 rounded-xl border border-amber-300 dark:border-amber-800 shadow-sm'
+                : 'bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm';
+            kpiUnexplained.className = hasUnexplained
+                ? 'text-sm xl:text-base font-bold text-amber-700 dark:text-amber-400 mt-0.5 truncate'
+                : 'text-sm xl:text-base font-bold text-slate-400 dark:text-slate-500 mt-0.5 truncate';
+
+            kpiFinal.textContent = formatNumber(bridge.finalValue, false);
+
+            dataCounter.textContent = `Total de colunas renderizadas: ${bridge.steps.length}`;
+            if (!engineSelfTestPassed) {
+                invariantBadge.className = 'hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-rose-100 text-rose-800 border border-rose-300 rounded-full';
+                invariantBadge.textContent = '✕ Falha no Auto-Teste';
+            } else if (bridge.invariantHolds && bridge.unexplainedGap === 0) {
+                invariantBadge.className = 'hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-full';
+                invariantBadge.textContent = '✓ Validado';
+                invariantCheckStatus.className = 'font-mono text-emerald-600 dark:text-emerald-400';
+                invariantCheckStatus.textContent = 'Invariante (BigInt): Base + ΣEventos = Final ✓';
+            } else if (bridge.statusType === 'plugged' && bridge.invariantHolds) {
+                invariantBadge.className = 'hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full';
+                invariantBadge.textContent = `⚠ Reconciliado via Plug (${formatExactDifference(bridge.unexplainedGap)})`;
+                invariantCheckStatus.className = 'font-mono text-amber-600 dark:text-amber-400 font-semibold';
+                invariantCheckStatus.textContent = `Invariante fechada via Plug: ${formatExactDifference(bridge.unexplainedGap)} ⚠`;
+            } else if (bridge.statusType === 'reconciled_with_tol') {
+                invariantBadge.className = 'hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 rounded-full';
+                invariantBadge.textContent = `≈ Diferença Tolerada (${formatExactDifference(bridge.unexplainedGap)})`;
+                invariantCheckStatus.className = 'font-mono text-amber-600 dark:text-amber-400 font-semibold';
+                invariantCheckStatus.textContent = `Fecha com diferença de ${formatExactDifference(bridge.unexplainedGap)} (dentro da tolerância) ≈`;
+            } else {
+                invariantBadge.className = 'hidden sm:inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800 rounded-full';
+                invariantBadge.textContent = `✕ Divergência (${formatExactDifference(bridge.unexplainedGap)})`;
+                invariantCheckStatus.className = 'font-mono text-rose-600 dark:text-rose-400 font-bold';
+                invariantCheckStatus.textContent = `Invariante Violada — Diferença de ${formatExactDifference(bridge.unexplainedGap)} ✕`;
+            }
+
+            renderExecutiveSummaryTable(bridge);
+
+            const chartConfig = createChartJSConfig(bridge);
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, chartConfig);
+        }
+
+        function generateStandard16x9LightCanvas() {
+            const offCanvas = document.createElement('canvas');
+            offCanvas.width = 1920;
+            offCanvas.height = 1080;
+            const offCtx = offCanvas.getContext('2d');
+
+            const bridge = buildBridge(appState);
+            const exportConfig = createChartJSConfig(bridge, {
+                forceLightMode: true,
+                responsive: false,
+                devicePixelRatio: 1,
+                disableAnimation: true,
+                maxBarThickness: 96,
+                fontSize: 16,
+                titleFontSize: 26
+            });
+
+            const tempChart = new Chart(offCtx, exportConfig);
+            tempChart.draw();
+            return { offCanvas, tempChart };
+        }
+
+        exportBtn.addEventListener('click', () => {
+            const { offCanvas, tempChart } = generateStandard16x9LightCanvas();
+            const link = document.createElement('a');
+            const cleanTitle = (appState.title || 'grafico-cascata')
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, '-');
+            link.download = `${cleanTitle}-16x9.png`;
+            link.href = offCanvas.toDataURL('image/png', 1.0);
+            link.click();
+            tempChart.destroy();
+            showToast('PNG 16:9 Full HD (Fundo Claro) exportado!', false);
+        });
+
+        copyImageBtn.addEventListener('click', () => {
+            const { offCanvas, tempChart } = generateStandard16x9LightCanvas();
+            if (navigator.clipboard && window.ClipboardItem) {
+                offCanvas.toBlob(async (blob) => {
+                    tempChart.destroy();
+                    if (!blob) return;
+                    try {
+                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+                        showToast('Imagem 16:9 (Fundo Claro) copiada! Cole (Ctrl+V) no seu slide.', false);
+                    } catch (e) {
+                        exportBtn.click();
+                    }
+                }, 'image/png', 1.0);
+            } else {
+                tempChart.destroy();
+                exportBtn.click();
+            }
+        });
+
+        exportSvgBtn.addEventListener('click', () => {
+            const bridge = buildBridge(appState);
+            const steps = bridge.steps;
+            if (steps.length === 0) return;
+
+            const width = 1280;
+            const height = 720;
+            const padLeft = 100;
+            const padRight = 60;
+            const padTop = 110;
+            const padBottom = 90;
+            const plotW = width - padLeft - padRight;
+            const plotH = height - padTop - padBottom;
+
+            const bounds = computeAxisBounds(steps, appState.enableAxisBreak, appState.showDeltaBracket);
+            const yMin = bounds.ySuggestedMin;
+            const yMax = bounds.ySuggestedMax;
+            const valToY = (v) => padTop + plotH - ((v - yMin) / (yMax - yMin || 1)) * plotH;
+
+            const slotW = plotW / steps.length;
+            const barW = Math.min(slotW * 0.58, 76);
+
+            let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" font-family="Inter, Arial, sans-serif">\n`;
+            svg += `  <defs>\n    <pattern id="plugHatch" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">\n      <rect width="10" height="10" fill="#fef3c7"/>\n      <line x1="0" y1="0" x2="0" y2="10" stroke="#d97706" stroke-width="4"/>\n    </pattern>\n  </defs>\n`;
+            svg += `  <rect width="100%" height="100%" fill="#ffffff"/>\n`;
+            svg += `  <text x="${width / 2}" y="46" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">${escapeHtml(appState.title)}</text>\n`;
+
+            const gridTicks = 5;
+            for (let t = 0; t <= gridTicks; t++) {
+                const gv = yMin + ((yMax - yMin) * (t / gridTicks));
+                const gy = valToY(gv);
+                svg += `  <line x1="${padLeft}" y1="${gy.toFixed(1)}" x2="${width - padRight}" y2="${gy.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>\n`;
+                svg += `  <text x="${padLeft - 12}" y="${(gy + 4).toFixed(1)}" text-anchor="end" font-size="12" fill="#475569">${escapeHtml(formatNumber(gv, false))}</text>\n`;
+            }
+
+            steps.forEach((s, i) => {
+                const cx = padLeft + i * slotW + slotW / 2;
+                const bx = cx - barW / 2;
+                const rawStart = bounds.axisBreakActive && (s.isBase || s.isTotal || s.isSubtotal) ? bounds.effectiveMin : s.start;
+                const y1 = valToY(Math.max(rawStart, s.end));
+                const y2 = valToY(Math.min(rawStart, s.end));
+                const bh = Math.max(Math.abs(y2 - y1), 3);
+
+                let fill = '#2563eb';
+                let labelColor = '#1d4ed8';
+                if (!s.isBase && !s.isTotal && !s.isSubtotal) {
+                    if (s.isAdjustment) {
+                        fill = 'url(#plugHatch)';
+                        labelColor = '#b45309';
+                    } else if (s.diff >= 0) {
+                        fill = '#10b981';
+                        labelColor = '#047857';
+                    } else {
+                        fill = '#f43f5e';
+                        labelColor = '#be123c';
+                    }
+                }
+
+                svg += `  <rect x="${bx.toFixed(1)}" y="${y1.toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="5" fill="${fill}"/>\n`;
+
+                if (appState.showConnectors && i < steps.length - 1) {
+                    const nextCx = padLeft + (i + 1) * slotW + slotW / 2;
+                    const cy = valToY(s.end);
+                    svg += `  <line x1="${(bx + barW).toFixed(1)}" y1="${cy.toFixed(1)}" x2="${(nextCx - barW / 2).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,4"/>\n`;
+                }
+
+                if (appState.showDataLabels) {
+                    const isNeg = !s.isBase && !s.isTotal && !s.isSubtotal && s.diff < 0;
+                    const ly = isNeg ? (y2 + 18) : (y1 - 10);
+                    const txt = (s.isBase || s.isTotal || s.isSubtotal) ? formatNumber(s.end, false) : formatNumber(s.diff, true);
+                    svg += `  <text x="${cx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="13" font-weight="600" fill="${labelColor}">${escapeHtml(txt)}</text>\n`;
+                }
+
+                svg += `  <text x="${cx.toFixed(1)}" y="${height - padBottom + 28}" text-anchor="middle" font-size="12" font-weight="500" fill="#334155">${escapeHtml(s.label)}</text>\n`;
+            });
+
+            svg += `</svg>`;
+
+            const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+            const link = document.createElement('a');
+            link.download = 'waterfall-chart.svg';
+            link.href = URL.createObjectURL(blob);
+            link.click();
+            showToast('Arquivo Vetorial .SVG exportado!', false);
+        });
+
+        function safeCopyTextToClipboard(text, onSuccessMessage) {
+            const fallbackCopy = () => {
+                try {
+                    const tempTextArea = document.createElement('textarea');
+                    tempTextArea.value = text;
+                    tempTextArea.setAttribute('readonly', '');
+                    tempTextArea.style.position = 'fixed';
+                    tempTextArea.style.top = '-9999px';
+                    tempTextArea.style.left = '-9999px';
+                    document.body.appendChild(tempTextArea);
+                    tempTextArea.focus();
+                    tempTextArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempTextArea);
+                    showToast(onSuccessMessage, false);
+                } catch (err) {
+                    showToast('Não foi possível acessar a área de transferência.', false);
+                }
+            };
+
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                navigator.clipboard.writeText(text)
+                    .then(() => showToast(onSuccessMessage, false))
+                    .catch(() => fallbackCopy());
+            } else {
+                fallbackCopy();
+            }
+        }
+
+        function copyTableToClipboard(rawNumbersOnly = true) {
+            if (!lastBridgeResult) return;
+            const baseVal = lastBridgeResult.initialBase;
+            const locale = appState.displayLocale || 'pt-BR';
+            const decSep = locale === 'pt-BR' ? ',' : '.';
+
+            const formatRawNum = (n) => String(Number(n.toFixed(4))).replace('.', decSep);
+
+            const header = ['Etapa / Categoria', 'Classificacao', 'Impacto ou Nivel', 'Percentual sobre Base', 'Saldo Acumulado'].join('\t');
+            const lines = lastBridgeResult.steps.map(s => {
+                const tipo = (s.isBase && !s.isTotal) ? 'Base Inicial' : (s.isSubtotal ? 'Subtotal' : (s.isTotal ? 'Base Final' : (s.isAdjustment ? 'Plug / Nao Explicado' : (s.diff >= 0 ? 'Impacto (+)' : 'Impacto (-)'))));
+                const valNum = (s.isBase || s.isTotal || s.isSubtotal) ? s.end : s.diff;
+                const pctNum = baseVal !== 0 ? (valNum / Math.abs(baseVal)) : 0;
+
+                if (rawNumbersOnly) {
+                    return [
+                        s.label,
+                        tipo,
+                        formatRawNum(valNum),
+                        baseVal !== 0 ? formatRawNum(pctNum) : '0',
+                        formatRawNum(s.end)
+                    ].join('\t');
+                } else {
+                    return [
+                        s.label,
+                        tipo,
+                        formatNumber(valNum, !(s.isBase || s.isTotal || s.isSubtotal)),
+                        baseVal !== 0 ? formatPercent(pctNum, !(s.isBase || s.isTotal || s.isSubtotal)) : '—',
+                        formatNumber(s.end, false)
+                    ].join('\t');
+                }
+            });
+
+            const tsvContent = [header, ...lines].join('\n');
+            const msg = rawNumbersOnly
+                ? 'TSV Numérico Puro copiado! Pronto para somar no Excel.'
+                : 'TSV Formatado copiado!';
+            safeCopyTextToClipboard(tsvContent, msg);
+        }
+
+        copyRawTsvBtn.addEventListener('click', () => copyTableToClipboard(true));
+        copyFormattedTsvBtn.addEventListener('click', () => copyTableToClipboard(false));
+
+        /**
+         * Gerador Nativo de Arquivo .XLSX (OpenXML + ZIP em JavaScript puro)
+         * Garante 100% de funcionamento mesmo sem internet ou se a CDN do SheetJS for bloqueada.
+         */
+        function buildNativeXlsxBlob(rows) {
+            const crcTable = new Uint32Array(256);
+            for (let n = 0; n < 256; n++) {
+                let c = n;
+                for (let k = 0; k < 8; k++) {
+                    c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+                }
+                crcTable[n] = c >>> 0;
+            }
+
+            const crc32 = (bytes) => {
+                let c = 0xffffffff;
+                for (let i = 0; i < bytes.length; i++) {
+                    c = crcTable[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+                }
+                return (c ^ 0xffffffff) >>> 0;
+            };
+
+            const enc = new TextEncoder();
+            const xmlEsc = (v) => String(v ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+
+            const headers = Object.keys(rows[0] || {});
+            const colLetter = (idx) => String.fromCharCode(65 + idx);
+
+            let sheetRowsXml = '';
+            // Linha 1: Cabeçalho
+            sheetRowsXml += `<row r="1">`;
+            headers.forEach((h, cIdx) => {
+                const ref = `${colLetter(cIdx)}1`;
+                sheetRowsXml += `<c r="${ref}" t="inlineStr"><is><t>${xmlEsc(h)}</t></is></c>`;
+            });
+            sheetRowsXml += `</row>`;
+
+            // Linhas de dados com células numéricas nativas
+            rows.forEach((rowObj, rIdx) => {
+                const rowNum = rIdx + 2;
+                sheetRowsXml += `<row r="${rowNum}">`;
+                headers.forEach((h, cIdx) => {
+                    const ref = `${colLetter(cIdx)}${rowNum}`;
+                    const val = rowObj[h];
+                    if (typeof val === 'number' && Number.isFinite(val)) {
+                        sheetRowsXml += `<c r="${ref}"><v>${val}</v></c>`;
+                    } else {
+                        sheetRowsXml += `<c r="${ref}" t="inlineStr"><is><t>${xmlEsc(val)}</t></is></c>`;
+                    }
+                });
+                sheetRowsXml += `</row>`;
+            });
+
+            const files = [
+                {
+                    name: '[Content_Types].xml',
+                    content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>`
+                },
+                {
+                    name: '_rels/.rels',
+                    content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`
+                },
+                {
+                    name: 'xl/workbook.xml',
+                    content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Ponte Waterfall" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`
+                },
+                {
+                    name: 'xl/_rels/workbook.xml.rels',
+                    content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</Relationships>`
+                },
+                {
+                    name: 'xl/worksheets/sheet1.xml',
+                    content: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData>${sheetRowsXml}</sheetData>
+</worksheet>`
+                }
+            ];
+
+            const localParts = [];
+            const centralParts = [];
+            let offset = 0;
+
+            files.forEach(f => {
+                const nameBytes = enc.encode(f.name);
+                const dataBytes = enc.encode(f.content);
+                const crc = crc32(dataBytes);
+                const size = dataBytes.length;
+
+                const localHeader = new Uint8Array(30 + nameBytes.length);
+                const lv = new DataView(localHeader.buffer);
+                lv.setUint32(0, 0x04034b50, true);
+                lv.setUint16(4, 20, true);
+                lv.setUint16(6, 0, true);
+                lv.setUint16(8, 0, true);
+                lv.setUint16(10, 0, true);
+                lv.setUint16(12, 0, true);
+                lv.setUint32(14, crc, true);
+                lv.setUint32(18, size, true);
+                lv.setUint32(22, size, true);
+                lv.setUint16(26, nameBytes.length, true);
+                lv.setUint16(28, 0, true);
+                localHeader.set(nameBytes, 30);
+
+                localParts.push(localHeader, dataBytes);
+
+                const centralHeader = new Uint8Array(46 + nameBytes.length);
+                const cv = new DataView(centralHeader.buffer);
+                cv.setUint32(0, 0x02014b50, true);
+                cv.setUint16(4, 20, true);
+                cv.setUint16(6, 20, true);
+                cv.setUint16(8, 0, true);
+                cv.setUint16(10, 0, true);
+                cv.setUint16(12, 0, true);
+                cv.setUint16(14, 0, true);
+                cv.setUint32(16, crc, true);
+                cv.setUint32(20, size, true);
+                cv.setUint32(24, size, true);
+                cv.setUint16(28, nameBytes.length, true);
+                cv.setUint16(30, 0, true);
+                cv.setUint16(32, 0, true);
+                cv.setUint16(34, 0, true);
+                cv.setUint16(36, 0, true);
+                cv.setUint32(38, 0, true);
+                cv.setUint32(42, offset, true);
+                centralHeader.set(nameBytes, 46);
+
+                centralParts.push(centralHeader);
+                offset += localHeader.length + dataBytes.length;
+            });
+
+            const centralSize = centralParts.reduce((acc, p) => acc + p.length, 0);
+            const eocd = new Uint8Array(22);
+            const ev = new DataView(eocd.buffer);
+            ev.setUint32(0, 0x06054b50, true);
+            ev.setUint16(4, 0, true);
+            ev.setUint16(6, 0, true);
+            ev.setUint16(8, files.length, true);
+            ev.setUint16(10, files.length, true);
+            ev.setUint32(12, centralSize, true);
+            ev.setUint32(16, offset, true);
+            ev.setUint16(20, 0, true);
+
+            return new Blob([...localParts, ...centralParts, eocd], {
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+        }
+
+        /**
+         * Exportação .XLSX Nativa (SheetJS + Fallback OpenXML Puro Embutido)
+         */
+        exportXlsxBtn.addEventListener('click', () => {
+            if (!lastBridgeResult) return;
+
+            const baseVal = lastBridgeResult.initialBase;
+            const rows = lastBridgeResult.steps.map(s => {
+                const tipo = (s.isBase && !s.isTotal) ? 'Base Inicial' : (s.isSubtotal ? 'Subtotal' : (s.isTotal ? 'Base Final' : (s.isAdjustment ? 'Plug / Não Explicado' : (s.diff >= 0 ? 'Impacto (+)' : 'Impacto (-)'))));
+                const valNum = (s.isBase || s.isTotal || s.isSubtotal) ? s.end : s.diff;
+                return {
+                    'Etapa / Categoria': s.label,
+                    'Classificação': tipo,
+                    'Impacto / Nível': Number(valNum.toFixed(4)),
+                    '% s/ Base Inicial': baseVal !== 0 ? Number((valNum / Math.abs(baseVal)).toFixed(4)) : 0,
+                    'Saldo Acumulado': Number(s.end.toFixed(4))
+                };
+            });
+
+            if (typeof XLSX !== 'undefined' && XLSX.utils && typeof XLSX.writeFile === 'function') {
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Ponte Waterfall');
+                XLSX.writeFile(wb, 'reconciliacao-waterfall.xlsx');
+                showToast('Planilha numérica .XLSX exportada!', false);
+            } else {
+                const blob = buildNativeXlsxBlob(rows);
+                const link = document.createElement('a');
+                link.download = 'reconciliacao-waterfall.xlsx';
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(link.href), 5000);
+                showToast('Planilha numérica .XLSX exportada (Motor Nativo)!', false);
+            }
+        });
+
+        const tabButtons = document.querySelectorAll('.sidebar-tab-btn');
+        const tabContents = document.querySelectorAll('.sidebar-tab-content');
+
+        function switchSidebarTab(targetTab) {
+            tabButtons.forEach(btn => {
+                const isTarget = btn.getAttribute('data-tab') === targetTab;
+                btn.className = isTarget
+                    ? 'sidebar-tab-btn py-2 px-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 shadow-sm'
+                    : 'sidebar-tab-btn py-2 px-2 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white';
+            });
+            tabContents.forEach(content => {
+                content.classList.toggle('hidden', content.id !== `tab-${targetTab}`);
+            });
+        }
+
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => switchSidebarTab(btn.getAttribute('data-tab')));
+        });
+
+        function applyThemeMode(dark) {
+            appState.darkMode = Boolean(dark);
+            document.documentElement.classList.toggle('dark', appState.darkMode);
+            sunIcon.classList.toggle('hidden', !appState.darkMode);
+            moonIcon.classList.toggle('hidden', appState.darkMode);
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            applyThemeMode(!appState.darkMode);
+            saveStateToStorage();
+            updateApplicationView();
+        });
+
+        function updateModeVisibility() {
+            const isBridge = appState.analysisMode === 'bridge';
+            bridgePeriodsPanel.classList.toggle('hidden', !isBridge);
+            cumulativeTotalOptions.classList.toggle('hidden', isBridge);
+            totalLabelContainer.style.display = appState.showTotalBar ? 'block' : 'none';
+        }
+
+        function syncInputsFromState() {
+            analysisModeSelect.value = appState.analysisMode;
+            chartTitleInput.value = appState.title;
+            startPeriodLabelInput.value = appState.startPeriodLabel;
+            startPeriodValueInput.value = appState.startPeriodValue;
+            endPeriodLabelInput.value = appState.endPeriodLabel;
+            endPeriodValueInput.value = appState.endPeriodValue;
+            autoReconcileGapInput.checked = Boolean(appState.autoReconcileGap);
+            reconcileTolerancePctSelect.value = String(appState.reconcileTolerancePct ?? 'strict');
+            xAxisNameInput.value = appState.xAxisName;
+            yAxisNameInput.value = appState.yAxisName;
+            showTotalBarInput.checked = Boolean(appState.showTotalBar);
+            totalBarLabelInput.value = appState.totalBarLabel;
+            showConnectorsInput.checked = Boolean(appState.showConnectors);
+            showDataLabelsInput.checked = Boolean(appState.showDataLabels);
+            showDeltaBracketInput.checked = Boolean(appState.showDeltaBracket);
+            showPercentInLabelsInput.checked = Boolean(appState.showPercentInLabels);
+            enableAxisBreakInput.checked = Boolean(appState.enableAxisBreak);
+            displayLocaleSelect.value = appState.displayLocale || 'pt-BR';
+            importLocaleSelect.value = appState.importLocale || 'pt-BR';
+            numberPrefixSelect.value = appState.numberPrefix;
+            numberSuffixSelect.value = appState.numberSuffix;
+            decimalPlacesSelect.value = String(appState.decimalPlaces);
+            colorPaletteSelect.value = appState.colorPalette;
+            applyThemeMode(appState.darkMode);
+            updateModeVisibility();
+        }
+
+        function syncStateFromInputs() {
+            appState.analysisMode = analysisModeSelect.value;
+            appState.title = chartTitleInput.value;
+            appState.startPeriodLabel = startPeriodLabelInput.value;
+            appState.startPeriodValue = startPeriodValueInput.value;
+            appState.endPeriodLabel = endPeriodLabelInput.value;
+            appState.endPeriodValue = endPeriodValueInput.value;
+            appState.autoReconcileGap = autoReconcileGapInput.checked;
+            appState.reconcileTolerancePct = reconcileTolerancePctSelect.value;
+            appState.xAxisName = xAxisNameInput.value;
+            appState.yAxisName = yAxisNameInput.value;
+            appState.showTotalBar = showTotalBarInput.checked;
+            appState.totalBarLabel = totalBarLabelInput.value;
+            appState.showConnectors = showConnectorsInput.checked;
+            appState.showDataLabels = showDataLabelsInput.checked;
+            appState.showDeltaBracket = showDeltaBracketInput.checked;
+            appState.showPercentInLabels = showPercentInLabelsInput.checked;
+            appState.enableAxisBreak = enableAxisBreakInput.checked;
+            appState.displayLocale = displayLocaleSelect.value;
+            appState.importLocale = importLocaleSelect.value;
+            appState.numberPrefix = numberPrefixSelect.value;
+            appState.numberSuffix = numberSuffixSelect.value;
+            appState.decimalPlaces = decimalPlacesSelect.value;
+            appState.colorPalette = colorPaletteSelect.value;
+        }
+
+        function saveStateToStorage() {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+            } catch (e) {
+                console.error('Erro ao salvar estado:', e);
+            }
+        }
+
+        function loadStateFromStorage() {
+            try {
+                const raw = localStorage.getItem(STORAGE_KEY);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    appState = {
+                        ...JSON.parse(JSON.stringify(DEFAULT_STATE)),
+                        ...parsed,
+                        events: Array.isArray(parsed.events) ? parsed.events : JSON.parse(JSON.stringify(DEFAULT_STATE.events))
+                    };
+                }
+            } catch (e) {
+                appState = JSON.parse(JSON.stringify(DEFAULT_STATE));
+            }
+            syncInputsFromState();
+            renderVisualEventEditor();
+        }
+
+        [
+            chartTitleInput,
+            startPeriodLabelInput,
+            startPeriodValueInput,
+            endPeriodLabelInput,
+            endPeriodValueInput,
+            xAxisNameInput,
+            yAxisNameInput,
+            totalBarLabelInput
+        ].forEach(el => {
+            el.addEventListener('input', () => {
+                syncStateFromInputs();
+                saveStateToStorage();
+                updateApplicationView();
+            });
+        });
+
+        [
+            analysisModeSelect,
+            autoReconcileGapInput,
+            reconcileTolerancePctSelect,
+            showTotalBarInput,
+            showConnectorsInput,
+            showDataLabelsInput,
+            showDeltaBracketInput,
+            showPercentInLabelsInput,
+            enableAxisBreakInput,
+            displayLocaleSelect,
+            numberPrefixSelect,
+            numberSuffixSelect,
+            decimalPlacesSelect,
+            colorPaletteSelect
+        ].forEach(el => {
+            el.addEventListener('change', () => {
+                syncStateFromInputs();
+                updateModeVisibility();
+                saveStateToStorage();
+                updateApplicationView();
+                updateLiveImportPreview();
+            });
+        });
+
+        function resetToDefaultExample() {
+            pushUndoSnapshot('Restauração de Exemplo');
+            const keepDark = appState.darkMode;
+            appState = {
+                ...JSON.parse(JSON.stringify(DEFAULT_STATE)),
+                darkMode: keepDark
+            };
+            syncInputsFromState();
+            renderVisualEventEditor();
+            saveStateToStorage();
+            updateApplicationView();
+            showToast('Exemplo padrão restaurado!', true);
+        }
+
+        resetDataBtn.addEventListener('click', resetToDefaultExample);
+        loadExampleTopBtn.addEventListener('click', resetToDefaultExample);
+
+        window.addEventListener('DOMContentLoaded', () => {
+            runEngineSelfTest();
+            loadStateFromStorage();
+            updateApplicationView();
+            updateLiveImportPreview();
+        });
+    </script>
+</body>
+</html>
